@@ -3,10 +3,8 @@ from mesa.visualization.ModularVisualization import ModularServer
 from model import Tube
 from SimpleContinuousModule import SimpleCanvas
 
-
 def bacteria_draw(agent):
     return {"Shape": "circle", "r": 2, "Filled": "true", "Color": "Red"}
-
 
 bacteria_canvas = SimpleCanvas(bacteria_draw, 500, 500) #this controls the size of the visualised space in the server
 
