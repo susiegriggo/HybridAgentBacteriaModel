@@ -56,8 +56,8 @@ class Bacteria(Agent):
         self.dt = 0.1 #time for each tick in the simulation
         self.timer = 0  #traces where up to on the current run/tumble
         self.ang = 0 # angle for running
-        self.x_wiener = self.wienerProcess(10, self.dt)
-        self.y_wiener = self.wienerProcess(10, self.dt)
+        self.x_wiener = self.wienerProcess(20, self.dt)
+        self.y_wiener = self.wienerProcess(20, self.dt)
         self.c_start = 0 #concentration of attractant at the start of the run
         self.c_end = 0 #concentration of attractant at the end of the run
 
@@ -253,8 +253,8 @@ class Bacteria(Agent):
                 self.duration = self.getDuration(self.mean_run)
                 #get the wiener processes for the next run
                 #generate for 10 seconds in case the run is extended
-                self.x_wiener = self.wienerProcess(10, self.dt)
-                self.y_wiener = self.wienerProcess(10, self.dt)
+                self.x_wiener = self.wienerProcess(20, self.dt)
+                self.y_wiener = self.wienerProcess(20, self.dt)
 
             #if currently running see if running in the direction of nutrients
             elif self.status == 1:

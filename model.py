@@ -1,20 +1,12 @@
 """
-Bacteria run and tumble
-=============================================================
-A Mesa implementation modified from Craig Reynolds's Boids flocker model.
-Uses numpy arrays to represent vectors.
-
-There was an issue with the agents position position matrix occasionally not being positive definite
-The gaussian_kde class has been modified in scipy such the covariance matrix is modified suh that epsilon * np.eye(D).
-This has the effects of adding epsilon to each one of the eigenvalues. As episilon is small this doesn't introduce much error.
-
-Chemical field PDE is solved using implicit discretionization. Can be demonstrated that it is stable
+Tube model which inserts a predefined number of bacteria.
+The concentration of attractant is modelled using a partial differential equation.
+The density of bacteria used in the partial differetial equation
 """
 
 import numpy as np
 import statsmodels.api as sm
 import pandas as pd
-import sys
 
 from mesa import Model
 from mesa.space import ContinuousSpace
@@ -27,11 +19,11 @@ D_c = 1.e-10 #diffusion coefficient of the nutrients
 c_0= 5.56E-3 #intial concentration of glucose in the tube
 beta = 5E-18 #number of moles of glucose consumed per bacteria per second
 radius = 10E-4  #radius of bacteria in centimetres
-gamma = 0.3 #how far the bacteria get nutrients from the outside of the radius
+
+#scaling parameters
 tau = 1 #time scale
 L = 1 #lengh scaling
-Na = 1000
-p_inf =Na/(15*1) #todo - starting cells/cm^2
+p_inf = 1 #population scaling
 
 #calculate the values for non-dimensionalised parameters
 D_star = (D_c*tau)/(L*L)
@@ -66,7 +58,6 @@ class Tube(Model):
         self.dt = 0.1 #length of the timesteps in the model
         self.nx = int(width/self.dx)
         self.ny = int(height/self.dy)
-        #add concentration field here
         self.u0 = c_star * np.ones((self.nx+1, self.ny+1))
         self.u = self.u0.copy()
         self.schedule = RandomActivation(self)
