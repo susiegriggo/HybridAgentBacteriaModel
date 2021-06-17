@@ -18,7 +18,7 @@ model_params = {
 
 
 #server = ModularServer(Tube, [bacteria_canvas], "Bacteria", model_params)
-model = Tube(10,20,1) 
-for i in range(10):
+model = Tube(1000,20,1) 
+for i in range(10000):
     model.step()
     print('step: '+str(i))
