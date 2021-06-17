@@ -1,0 +1,16 @@
+/home/grig0076/miniconda3/envs/mesa_environment/lib/python3.9/site-packages/statsmodels/nonparametric/kernels.py:125: RuntimeWarning: invalid value encountered in true_divide
+  return (1. / np.sqrt(2 * np.pi)) * np.exp(-(Xi - x)**2 / (h**2 * 2.))
+/home/grig0076/miniconda3/envs/mesa_environment/lib/python3.9/site-packages/statsmodels/nonparametric/kernels.py:125: RuntimeWarning: divide by zero encountered in true_divide
+  return (1. / np.sqrt(2 * np.pi)) * np.exp(-(Xi - x)**2 / (h**2 * 2.))
+/home/grig0076/miniconda3/envs/mesa_environment/lib/python3.9/site-packages/statsmodels/nonparametric/_kernel_base.py:514: RuntimeWarning: invalid value encountered in true_divide
+  dens = Kval.prod(axis=1) / np.prod(bw[iscontinuous])
+step: 0
+step: 1
+step: 2
+step: 3
+step: 4
+step: 5
+step: 6
+step: 7
+step: 8
+step: 9
