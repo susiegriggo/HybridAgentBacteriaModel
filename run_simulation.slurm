@@ -11,5 +11,5 @@
 # How much memory. I usually request 2000M (2 GB) if I am not sure
 #SBATCH --mem=32000M
 
-python server.py
+python server.py -w 20 -he 1 -p 1000 -s 1000
 
