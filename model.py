@@ -199,7 +199,7 @@ class Tube(Model):
         #                self.u0[1:-1, 2:] - 2 * self.u0[1:-1, 1:-1] + self.u0[1:-1, :-2]) / dy2)
         #self.u[1:-1, 1:-1] = self.u[1:-1, 1:-1] - self.dt * beta * bacterial_density[1:-1, 1:-1]
 
-        a = self.population/Na #scaling the density by the number of agents
+
         self.u[1:-1, 1:-1] = self.u0[1:-1, 1:-1] + D_star * self.dt * ((self.u0[2:, 1:-1] - 2 * self.u0[1:-1, 1:-1] + self.u0[:-2, 1:-1]) / dx2 + (
                         self.u0[1:-1, 2:] - 2 * self.u0[1:-1, 1:-1] + self.u0[1:-1, :-2]) / dy2) - self.dt * beta_star * self.u0[1:-1, 1:-1]*bacterial_density[1:-1, 1:-1]
 
