@@ -16,3 +16,4 @@ model = Tube(args.population, args.width, args.height)
 for i in range(10):
     model.step()
     print('step: '+str(i))
+    
