@@ -1,7 +1,7 @@
 """
-Tube model which inserts a predefined number of bacteria.
+Tube model which inserts a number of bacteria set in server.py
 The concentration of attractant is modelled using a partial differential equation.
-The density of bacteria used in the partial differetial equation
+The density of bacteria is approximated using kernel density estimation. 
 """
 
 import numpy as np
@@ -27,7 +27,7 @@ p_inf = 1 #population scaling
 
 #calculate the values for non-dimensionalised parameters
 D_star = (D_c*tau)/(L*L)
-c_star = 1
+c_star = 1 
 beta_star = (beta*p_inf*tau)/c_0
 
 doubling_mean = 27000 #mean doubling time of bacteria in seconds in 0.1% glucose
@@ -35,7 +35,7 @@ doubling_std = 120 #std of doubling time of bacteria in seconds in 0.1% glucose
 
 class Tube(Model):
     """
-    Flocker model class. Handles agent creation, placement and scheduling.
+    Creates tube mode. Handles scheduling of the agents and calculates the denisites of bacteria. 
     """
 
     def __init__(
@@ -45,21 +45,16 @@ class Tube(Model):
         height=100,
 
     ):
-        """
-
-        Args:
-            population: Number of Bacteria
-            width, height: Size of the space."""
         self.population = population
         self.width = width
         self.height = height
-        self.dx = 0.01 #set the size of the increments in the x and y directions
-        self.dy = 0.01
+        self.dx = 0.01 #size of grid increments
         self.dt = 0.1 #length of the timesteps in the model
-        self.nx = int(width/self.dx)
-        self.ny = int(height/self.dy)
-        self.u0 = c_star * np.ones((self.nx+1, self.ny+1))
-        self.u = self.u0.copy()
+        self.nx = int(width/self.dx) #number of increments in x direction
+	self.ny = int(height/self.dx) #number of increments in y direction 
+        self.u0 = c_star * np.ones((self.nx+1, self.ny+1)) #starting concentration of bacteria 
+        self.u = self.u0.copy() #current concentration of bacteria - updating through each timestep 
+
         self.schedule = RandomActivation(self)
         self.space = ContinuousSpace(width, height, False)
         self.make_agents()
@@ -76,8 +71,8 @@ class Tube(Model):
             x = 0
             y = self.height/2
 
-
             pos = np.array((x, y))
+
             bacteria = Bacteria(
                 i,
                 self,
@@ -90,17 +85,16 @@ class Tube(Model):
             self.schedule.add(bacteria)
 
 
-
     def bacteriaReproduce(self):
         """
         Models the bacteria dividing and adding an extra agent at
         the same location as the bacterium which is dividing
-        :return:
         """
 
         # get a list containing all of the agents
         all_agents = self.schedule.agents
         agent_growthstate = np.array([all_agents[i].next_double for i in range(len(all_agents))])
+
         #identify which of these are less than dt
         grew = np.where(agent_growthstate < self.dt)
 
@@ -189,7 +183,7 @@ class Tube(Model):
         Uses finite difference equations of Ficks law from Franz et al.
         :return:
         """
-        dx2, dy2 = self.dx * self.dx, self.dy * self.dy
+        dx2, dy2 = self.dx * self.dx, self.dx * self.dx
 
         #get the gaussian density kernel of the bacteria
         bacterial_density = self.densityKernel().T
