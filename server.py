@@ -13,7 +13,6 @@ parser.add_argument( "-s", "--steps", help = 'number of steps for the model to p
 args = parser.parse_args()
 
 model = Tube(args.population, args.width, args.height) 
-for i in range(10):
+for i in range(args.steps):
     model.step()
-    print('step: '+str(i)
-
+    print('step: '+str(i))

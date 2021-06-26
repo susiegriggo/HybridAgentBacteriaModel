@@ -25,11 +25,6 @@ tau = 1 #time scale
 L = 1 #lengh scaling
 p_inf = 1 #population scaling
 
-#calculate the values for non-dimensionalised parameters
-D_star = (D_c*tau)/(L*L)
-c_star = 1 
-beta_star = (beta*p_inf*tau)/c_0
-
 doubling_mean = 27000 #mean doubling time of bacteria in seconds in 0.1% glucose
 doubling_std = 120 #std of doubling time of bacteria in seconds in 0.1% glucose
 
@@ -51,15 +46,22 @@ class Tube(Model):
         self.dx = 0.01 #size of grid increments
         self.dt = 0.1 #length of the timesteps in the model
         self.nx = int(width/self.dx) #number of increments in x direction
-	self.ny = int(height/self.dx) #number of increments in y direction 
-        self.u0 = c_star * np.ones((self.nx+1, self.ny+1)) #starting concentration of bacteria 
-        self.u = self.u0.copy() #current concentration of bacteria - updating through each timestep 
-
+	self.ny = int(height/self.dx) #number of increments in y direction
         self.schedule = RandomActivation(self)
         self.space = ContinuousSpace(width, height, False)
         self.make_agents()
-        self.running = True
+        self.running = True 
 
+	#calculate the values for non-dimensionalised parameters
+	self.D_star = (D_c*tau)/(L*L)
+	self.c_star = 1
+	self.beta_star = (beta*p_inf*tau)/(c_0*self.width*self.height) 
+
+	#generate grid to solve the concentration over 
+	self.u0 = c_star * np.ones((self.nx+1, self.ny+1)) #starting concentration of bacteria
+        self.u = self.u0.copy() #current concentration of bacteria - updating through each timestep
+
+	
     def make_agents(self):
 
         """
@@ -188,14 +190,9 @@ class Tube(Model):
         #get the gaussian density kernel of the bacteria
         bacterial_density = self.densityKernel().T
 
-        #update the concentration field
-        #self.u[1:-1, 1:-1] = self.u0[1:-1, 1:-1] + D_c * self.dt * ((self.u0[2:, 1:-1] - 2 * self.u0[1:-1, 1:-1] + self.u0[:-2, 1:-1]) / dx2 + (
-        #                self.u0[1:-1, 2:] - 2 * self.u0[1:-1, 1:-1] + self.u0[1:-1, :-2]) / dy2)
-        #self.u[1:-1, 1:-1] = self.u[1:-1, 1:-1] - self.dt * beta * bacterial_density[1:-1, 1:-1]
 
-
-        self.u[1:-1, 1:-1] = self.u0[1:-1, 1:-1] + D_star * self.dt * ((self.u0[2:, 1:-1] - 2 * self.u0[1:-1, 1:-1] + self.u0[:-2, 1:-1]) / dx2 + (
-                        self.u0[1:-1, 2:] - 2 * self.u0[1:-1, 1:-1] + self.u0[1:-1, :-2]) / dy2) - self.dt * beta_star * self.u0[1:-1, 1:-1]*bacterial_density[1:-1, 1:-1]
+        self.u[1:-1, 1:-1] = self.u0[1:-1, 1:-1] + self.D_star * self.dt * ((self.u0[2:, 1:-1] - 2 * self.u0[1:-1, 1:-1] + self.u0[:-2, 1:-1]) / dx2 + (
+                        self.u0[1:-1, 2:] - 2 * self.u0[1:-1, 1:-1] + self.u0[1:-1, :-2]) / dy2) - self.dt * self.beta_star *self.population*bacterial_density[1:-1, 1:-1]
 
         # set such that the concentration cannot be lowered below zero
         self.u[self.u < 0] = 0

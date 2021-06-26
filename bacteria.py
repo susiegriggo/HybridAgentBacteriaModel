@@ -235,10 +235,11 @@ class Bacteria(Agent):
         #update the time until the next double
         self.next_double = self.next_double - self.dt
 
-        # update the doubling time
+        #if bacteria have just doubled reset the doubling timer 
         if self.next_double < self.dt:
             self.next_double = np.random.normal(doubling_mean, doubling_std, 1)
-        #check whether the duration is up
+        
+	#check whether the duration is up
         if self.timer >= self.duration:
 
             # reset collision variable
