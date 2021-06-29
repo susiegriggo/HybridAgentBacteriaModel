@@ -9,17 +9,25 @@ from mesa import Agent
 #K = 1.38E-23  # Boltzman's coefficient
 #T = 298  # temperature in kelvin
 #vis = 0.027  # g/cm viscosity
-#radius = 10E-4  # cm
+radius = 10E-4  # cm
 #f_sphere = 8 * np.pi * vis * radius  # frictional drag coefficient for a sphere
 #D_rot = (K * T) / f_sphere
 D_rot = 0.062 #rational diffusion coefficient radians^2/s
 epsilon = 10E-10 #adjusts edges of the modelling space
 
-alpha = 2 #bias of the bacteria to the nutrients it is consuming
+alpha =  1 #bias of the bacteria to the nutrients it is consuming
 doubling_mean = 27000
 doubling_std = 120
+doubling_mean = 360
+doubling_std = 20
 velocity_mean = 2.41E-3 #mean velocity in cm/s
-velocity_std = 6.8E-4 #stadnard deviation of velocity in cm/s
+#velocity_std = 6.8E-8
+velocity_std = 0
+
+#wall effects
+arch_collision = 0.4 #probability of an arch collision
+tangent_collision = 1 - arch_collision #probability of a tangential deflection collision
+
 
 class Bacteria(Agent):
     """
@@ -53,7 +61,7 @@ class Bacteria(Agent):
         self.mean_tumble = 0.1
         self.status = 0 #determines whether running or tumbling. 0 is tumbling, 1 is running
         self.duration = self.getDuration(self.mean_tumble) #stores the time of the duration
-        self.dt = 0.1 #time for each tick in the simulation
+        self.dt = 0.01 #time for each tick in the simulation
         self.timer = 0  #traces where up to on the current run/tumble
         self.ang = 0 # angle for running
         self.x_wiener = self.wienerProcess(20, self.dt)
@@ -99,6 +107,7 @@ class Bacteria(Agent):
 
         return angle
 
+
     def getDuration(self, mean_t):
         """
         Get the duration from a Poisson distribution.
@@ -137,32 +146,31 @@ class Bacteria(Agent):
         """
         x = pos[0]
         y = pos[1]
-        step_num = int(self.timer / self.dt)
 
+        if x < 0 or x > model_width or y < 0 or y > model_height:
+
+        # draw from a uniform distribution to determine whether tangental collision occurs
+            collision_type = random.uniform(0, 1)
+            if collision_type <= tangent_collision:
+                #end the run prematurely and change to a tangent
+                #TODO could change this to act like a bounce rather than introducing a tumble early
+                self.timer = self.duration
+
+        #bacteria are hitting the left wall
         if x < 0:
             x = 0
-            #n = np.array((1.0, 0.0)) #normal vector to the wall
-            #e = [np.cos(np.deg2rad(self.ang)), np.sin(np.deg2rad(self.ang))]
-            #a = -1 * self.velocity * (np.dot(e, n) * n)
-            #self.F = n
+
+        #bacteria are hitting the right wall
         elif x > model_width:
             x = model_width-epsilon
-            #n = np.array((-1.0, 0.0)) #normal vector to the wall
-            #e = [np.cos(np.deg2rad(self.ang)), np.sin(np.deg2rad(self.ang))]
-            #a = -1 * self.velocity * (np.dot(e, n) * n)
-            #self.F = n
+
+        #bacteria are hitting the bottom wall
         if y < 0:
             y = 0
-            #n = np.array((0.0, 1.0)) #normal vector to the wall
-            #e = [np.cos(np.deg2rad(self.ang)), np.sin(np.deg2rad(self.ang))]
-            #a = -1 * self.velocity * (np.dot(e, n) * n)
-            #self.F= n
+
+        #bacteria are hitting the top wall
         elif y > model_height:
             y = model_height-epsilon
-            #n = np.array((0.0, -1.0)) #normal vecotr to the wall
-            #e = [np.cos(np.deg2rad(self.ang)), np.sin(np.deg2rad(self.ang))]
-            #a = -1 * self.velocity * (np.dot(e, n) * n)
-            #self.F = n
 
         return [x,y]
 
@@ -202,7 +210,7 @@ class Bacteria(Agent):
 
         #get the neighbours of the bacteria
 
-        vision = 1
+        vision = radius #vision is the radius of the bacteria
         colliders = self.model.space.get_neighbors(self.pos, vision, False)
 
         if len(colliders) > 0:
@@ -226,6 +234,7 @@ class Bacteria(Agent):
         x_new = self.pos[0] + self.velocity*self.status*np.cos(np.deg2rad(self.ang))*self.dt+np.sqrt(2*D_rot*self.dt)*self.x_wiener[step_num] #- self.velocity*(self.F[0])
         y_new = self.pos[1] + self.velocity*self.status*np.sin(np.deg2rad(self.ang))*self.dt+np.sqrt(2*D_rot*self.dt)*self.y_wiener[step_num]#- self.velocity*(self.F[1])
         new_pos = [x_new[0], y_new[0]]
+
         new_pos = self.checkCollision(new_pos)
         self.pos = new_pos #added
         self.model.space.move_agent(self, self.pos)
@@ -268,9 +277,12 @@ class Bacteria(Agent):
 
                 #if moving in the direction of nutrients continue to run
                 if self.c_end > self.c_start:
-                    #generate a duration for the next run
-                    self.duration = alpha*self.getDuration(self.mean_run)
-                    #don't update the angle or wiener proccess as continuing in same direction
+
+                    #if not located along a wall
+                    if new_pos[0]!= 0 and new_pos[0] != model_width-epsilon and new_pos[1] != 0 and new_pos[1] != model_height-epsilon:
+                        #generate a duration for the next run
+                        self.duration = alpha*self.getDuration(self.mean_run)
+                        #don't update the angle or wiener proccess as continuing in same direction
 
                 else:
                     #if moving in a 'bad' direction tumble

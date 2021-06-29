@@ -25,12 +25,12 @@ tau = 1 #time scale
 L = 1 #lengh scaling
 p_inf = 1 #population scaling
 
-doubling_mean = 27000 #mean doubling time of bacteria in seconds in 0.1% glucose
-doubling_std = 120 #std of doubling time of bacteria in seconds in 0.1% glucose
+doubling_mean = 360 #mean doubling time of bacteria
+doubling_std = 20 #std of doubling time of bacteria
 
 class Tube(Model):
 	"""
-	Creates tube mode. Handles scheduling of the agents and calculates the denisites of bacteria. 
+	Creates tube mode. Handles scheduling of the agents and calculates the densities of bacteria.
 	"""
 
 	def __init__(
@@ -55,7 +55,8 @@ class Tube(Model):
 		#calculate the values for non-dimensionalised parameters
 		self.D_star = (D_c*tau)/(L*L)
 		self.c_star = 1
-		self.beta_star = (beta*p_inf*tau)/(c_0*self.width*self.height) 
+		self.beta_star = (beta*p_inf*tau)/(c_0*self.width*self.height)
+		self.beta_star = 1E-4 #practise placeholder parameter 
 
 		#generate grid to solve the concentration over 
 		self.u0 = self.c_star * np.ones((self.nx+1, self.ny+1)) #starting concentration of bacteria
@@ -73,7 +74,7 @@ class Tube(Model):
 			x = 0
 			y = self.height/2
 
-			pos = np.array((x, y))
+			pos = np.array((0.3, y))
 
 			bacteria = Bacteria(
 				i,
@@ -192,6 +193,8 @@ class Tube(Model):
 		self.schedule.step()
 		self.stepConcentration()
 		self.bacteriaReproduce()
+		print('NUMBER OF BACTERIA: '+str(self.population))
+		print(self.population)
 
 def kernel(value, std):
 	"""
