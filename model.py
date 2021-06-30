@@ -1,7 +1,9 @@
 """
 Tube model which inserts a number of bacteria set in server.py
 The concentration of attractant is modelled using a partial differential equation.
-The density of bacteria is approximated using kernel density estimation. 
+The density of bacteria is approximated using kernel density estimation.
+
+Multiple model objects can be created - allowing for multiple simulations to be run as replicates
 """
 
 import numpy as np
@@ -28,6 +30,7 @@ p_inf = 1 #population scaling
 doubling_mean = 360 #mean doubling time of bacteria
 doubling_std = 20 #std of doubling time of bacteria
 
+
 class Tube(Model):
 	"""
 	Creates tube mode. Handles scheduling of the agents and calculates the densities of bacteria.
@@ -38,15 +41,18 @@ class Tube(Model):
 		population=100,
 		width=100,
 		height=100,
+		name = " "
 
 	):
 		self.population = population
 		self.width = width
 		self.height = height
-		self.dx = 0.01 #size of grid increments
+		self.name = name
+		self.dx = 0.005 #size of grid increments
 		self.dt = 0.1 #length of the timesteps in the model
 		self.nx = int(width/self.dx) #number of increments in x direction
 		self.ny = int(height/self.dx) #number of increments in y direction
+		self.ticks = 0 #count the number of ticks which have elapsed
 		self.schedule = RandomActivation(self)
 		self.space = ContinuousSpace(width, height, False)
 		self.make_agents()
@@ -56,13 +62,12 @@ class Tube(Model):
 		self.D_star = (D_c*tau)/(L*L)
 		self.c_star = 1
 		self.beta_star = (beta*p_inf*tau)/(c_0*self.width*self.height)
-		self.beta_star = 1E-4 #practise placeholder parameter 
+		self.beta_star = 1E-5 #practise placeholder parameter
 
 		#generate grid to solve the concentration over 
 		self.u0 = self.c_star * np.ones((self.nx+1, self.ny+1)) #starting concentration of bacteria
 		self.u = self.u0.copy() #current concentration of bacteria - updating through each timestep
 
-		
 	def make_agents(self):
 
 		"""
@@ -124,13 +129,11 @@ class Tube(Model):
 				#reset the growth status of the bacteria which just doubled
 				#all_agents[i].next_double = np.random.normal(doubling_mean, doubling_std, 1)
 
-
 	def densityKernel(self):
 		"""
-		Use the Gaussian density kernel to calculate the density of bacteria in the tube
+		Use the Multivariate Gaussian density kernel to calculate the density of bacteria in the tube
 
-		Uses a multivariate kernel estimate. Estimates the bandwidth
-		:return:
+		Uses a multivariate kernel estimate. Estimates the bandwidth using Scotts rule.
 		"""
 
 		# get a list containing all of the agents
@@ -138,7 +141,6 @@ class Tube(Model):
 
 		# get the postions of these agents
 		agent_positions = [all_agents[i].pos for i in range(len(all_agents))]
-		#agent_positions = np.array(agent_positions)
 
 		#determine how many decimals to round to
 		r= round(-1 * np.log10(self.dx))
@@ -149,9 +151,6 @@ class Tube(Model):
 		positions = np.vstack([X.ravel(), Y.ravel()])
 
 		dens = sm.nonparametric.KDEMultivariate(data = agent_positions, var_type = 'cc')
-
-		#get the bandwidth matrix
-		bw = dens.bw
 
 		#get the density at each grid point
 		bact_dens = dens.pdf(positions)
@@ -166,7 +165,6 @@ class Tube(Model):
 		"""
 		Update the concentration grid of the model depending on the current location of agents.
 		Uses finite difference equations of Ficks law from Franz et al.
-		:return:
 		"""
 		dx2, dy2 = self.dx * self.dx, self.dx * self.dx
 
@@ -184,17 +182,26 @@ class Tube(Model):
 
 		#have the concentration save to a file such that it can be read by the agents
 		u_df = pd.DataFrame(self.u)
-		u_df.to_csv('concentration_field.csv', index = False)
+		conc_file = str(self.name) + '_concentration_field.csv'
+		u_df.to_csv(conc_file, index = False)
 
 		dens_df = pd.DataFrame(bacterial_density)
-		dens_df.to_csv('density_field.csv', index = False )
+		dens_file = str(self.name) + '_density_field.csv'
+		dens_df.to_csv(dens_file, index = False )
+
+		#save updated versions of the density and concentration periodically
+		if self.ticks % 50 == 0: #save every 50 ticks (i.e every 5 seconds)
+			concfield_name = str(self.name)+'_concentration_field_'+str(self.ticks) + "_ticks.csv"
+			densfield_name = str(self.name)+'_density_field_' +str(self.ticks) + "_ticks.csv"
+			u_df.to_csv(concfield_name, index = False)
+			dens_df.to_csv(densfield_name, index = False)
 
 	def step(self):
 		self.schedule.step()
 		self.stepConcentration()
 		self.bacteriaReproduce()
-		print('NUMBER OF BACTERIA: '+str(self.population))
-		print(self.population)
+		#update the number of ticks which have occured
+		self.ticks = self.ticks + 1
 
 def kernel(value, std):
 	"""
