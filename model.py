@@ -62,7 +62,7 @@ class Tube(Model):
 		self.D_star = (D_c*tau)/(L*L)
 		self.c_star = 1
 		self.beta_star = (beta*p_inf*tau)/(c_0*self.width*self.height)
-		self.beta_star = 1E-8#practise placeholder parameter
+		#self.beta_star = 1E-8#practise placeholder parameter
 
 		#generate grid to solve the concentration over 
 		self.u0 = self.c_star * np.ones((self.nx+1, self.ny+1)) #starting concentration of bacteria

@@ -10,9 +10,10 @@ parser.add_argument("-p", "--population", help = 'number of cells in the startin
 parser.add_argument("-w", "--width", help = 'width of the modelling space', type = float)
 parser.add_argument( "-he", "--height", help = 'height of the modelling space', type = float)
 parser.add_argument( "-s", "--steps", help = 'number of steps for the model to perform', type = int)
+parser.add_argument("-n", "--name", help = 'prefix of the output files', type = str)
 args = parser.parse_args()
 
-model = Tube(args.population, args.width, args.height) 
+model = Tube(args.population, args.width, args.height, args.name)
 for i in range(args.steps):
     model.step()
     print('step: '+str(i))

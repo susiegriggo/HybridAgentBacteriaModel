@@ -10,9 +10,9 @@ def bacteria_draw(agent):
 
 bacteria_canvas = SimpleCanvas(bacteria_draw, 500, 500) #this controls the size of the visualised space in the server
 model_params = {
-    "population": 100,
-    "width":0.005,
-    "height": 0.001,
+    "population": 1000,
+    "width":2,
+    "height": 0.1,
 }
 
 

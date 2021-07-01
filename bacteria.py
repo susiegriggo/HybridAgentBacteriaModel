@@ -25,7 +25,7 @@ velocity_mean = 2.41E-3 #mean velocity in cm/s
 velocity_std = 0
 
 #wall effects
-arch_collision = 0 #probability of an arch collision
+arch_collision = 0.5 #probability of an arch collision
 tangent_collision = 1 - arch_collision #probability of a tangential deflection collision
 
 
@@ -160,24 +160,62 @@ class Bacteria(Agent):
         #bacteria are hitting the left wall
         if x < 0:
             x = 0
-            self.ang = self.ang+90
+
+            p = random.uniform(0, 1)
+
+            if p < arch_collision:
+                self.status = 0
+                self.timer = 0
+                self.duration = self.getDuration(self.mean_tumble)
+
+            else:
+            #tangental
+                self.ang = self.ang+90
 
         #bacteria are hitting the right wall
         elif x > model_width:
             x = model_width-epsilon
-            self.status = 0
-            self.timer = 0
-            self.duration = self.getDuration(self.mean_tumble)
+
+            p = random.uniform(0, 1)
+
+            if p < arch_collision:
+                self.status = 0
+                self.timer = 0
+                self.duration = self.getDuration(self.mean_tumble)
+
+            else:
+            #tangental
+                self.ang = self.ang+90
 
         #bacteria are hitting the bottom wall
         if y < 0:
             y = 0
-            self.ang = self.ang * -1
+
+            p = random.uniform(0, 1)
+
+            if p < arch_collision:
+                self.status = 0
+                self.timer = 0
+                self.duration = self.getDuration(self.mean_tumble)
+
+            else:
+            #tangental
+                self.ang = self.ang+90
 
         #bacteria are hitting the top wall
         elif y > model_height:
             y = model_height-epsilon
-            self.ang = self.ang * -1
+
+            p = random.uniform(0, 1)
+
+            if p < arch_collision:
+                self.status = 0
+                self.timer = 0
+                self.duration = self.getDuration(self.mean_tumble)
+
+            else:
+            #tangental
+                self.ang = self.ang+90
 
         return [x,y]
 
@@ -216,7 +254,7 @@ class Bacteria(Agent):
         """
 
         #get the neighbours of the bacteria
-        vision = 10E-5 #vision is the radius of the bacteria
+        vision = 10E-8 #vision is the radius of the bacteria
         colliders = self.model.space.get_neighbors(self.pos, vision, False)
 
         if len(colliders) > 0:
@@ -234,7 +272,7 @@ class Bacteria(Agent):
         """
 
         #check if the bacteria is about to collide
-        #self.neighbourCollide()
+        self.neighbourCollide()
         #get the current timestep in the run/tumble
         step_num = int(self.timer/self.dt)
         x_new = self.pos[0] + self.velocity*self.status*np.cos(np.deg2rad(self.ang))*self.dt#+np.sqrt(2*D_rot*self.dt)*self.x_wiener[step_num] #- self.velocity*(self.F[0])
@@ -253,8 +291,6 @@ class Bacteria(Agent):
         #if bacteria have just doubled reset the doubling timer 
         if self.next_double < self.dt:
             self.next_double = np.random.normal(doubling_mean, doubling_std, 1)
-
-
         #heap of debugging lines
         #print('run duration: '+str(self.duration))
         #print('run timer: '+str(self.timer))
