@@ -15,7 +15,7 @@ radius = 10E-4  # cm
 D_rot = 0.062 #rational diffusion coefficient radians^2/s
 epsilon = 10E-10 #adjusts edges of the modelling space
 
-alpha =  1 #bias of the bacteria to the nutrients it is consuming
+alpha =  2 #bias of the bacteria to the nutrients it is consuming
 doubling_mean = 27000
 doubling_std = 120
 doubling_mean = 360
@@ -25,7 +25,7 @@ velocity_mean = 2.41E-3 #mean velocity in cm/s
 velocity_std = 0
 
 #wall effects
-arch_collision = 0.4 #probability of an arch collision
+arch_collision = 0 #probability of an arch collision
 tangent_collision = 1 - arch_collision #probability of a tangential deflection collision
 
 
@@ -74,7 +74,7 @@ class Bacteria(Agent):
         else:
             self.next_double = np.random.normal(doubling_mean, doubling_std, 1)
 
-        self.F = [0,0] #variable which when not zero represents bacteria colliding with wall
+        self.F = [1,1] #variable which when not zero represents bacteria colliding with wall
 
         global model_width
         global model_height
@@ -147,30 +147,37 @@ class Bacteria(Agent):
         x = pos[0]
         y = pos[1]
 
-        if x < 0 or x > model_width or y < 0 or y > model_height:
+        #if x < 0 or x > model_width or y < 0 or y > model_height:
+        #    self.timer = self.duration #stop the run
 
         # draw from a uniform distribution to determine whether tangental collision occurs
-            collision_type = random.uniform(0, 1)
-            if collision_type <= tangent_collision:
+            #collision_type = random.uniform(0, 1)
+            #if collision_type <= tangent_collision:
                 #end the run prematurely and change to a tangent
-                #TODO could change this to act like a bounce rather than introducing a tumble early
-                self.timer = self.duration
+              #  #TODO could change this to act like a bounce rather than introducing a tumble early
+             #   self.timer = self.duration
 
         #bacteria are hitting the left wall
         if x < 0:
             x = 0
+            self.ang = self.ang+90
 
         #bacteria are hitting the right wall
         elif x > model_width:
             x = model_width-epsilon
+            self.status = 0
+            self.timer = 0
+            self.duration = self.getDuration(self.mean_tumble)
 
         #bacteria are hitting the bottom wall
         if y < 0:
             y = 0
+            self.ang = self.ang * -1
 
         #bacteria are hitting the top wall
         elif y > model_height:
             y = model_height-epsilon
+            self.ang = self.ang * -1
 
         return [x,y]
 
@@ -209,18 +216,17 @@ class Bacteria(Agent):
         """
 
         #get the neighbours of the bacteria
-
-        vision = radius #vision is the radius of the bacteria
+        vision = 10E-5 #vision is the radius of the bacteria
         colliders = self.model.space.get_neighbors(self.pos, vision, False)
 
         if len(colliders) > 0:
 
             #generate a new run angle
-            self.ang = self.getAngle(self.ang_mean, self.ang_std)
+            self.ang = (self.getAngle(self.ang_mean, self.ang_std) + self.ang) % 360
 
             #give the colliders new angles as well
             for collider in colliders:
-                collider.ang = self.getAngle(self.ang_mean, self.ang_std)
+                collider.ang = (self.getAngle(self.ang_mean, self.ang_std) +self.ang)%360
 
     def step(self):
         """
@@ -228,11 +234,11 @@ class Bacteria(Agent):
         """
 
         #check if the bacteria is about to collide
-        self.neighbourCollide()
+        #self.neighbourCollide()
         #get the current timestep in the run/tumble
         step_num = int(self.timer/self.dt)
-        x_new = self.pos[0] + self.velocity*self.status*np.cos(np.deg2rad(self.ang))*self.dt+np.sqrt(2*D_rot*self.dt)*self.x_wiener[step_num] #- self.velocity*(self.F[0])
-        y_new = self.pos[1] + self.velocity*self.status*np.sin(np.deg2rad(self.ang))*self.dt+np.sqrt(2*D_rot*self.dt)*self.y_wiener[step_num]#- self.velocity*(self.F[1])
+        x_new = self.pos[0] + self.velocity*self.status*np.cos(np.deg2rad(self.ang))*self.dt#+np.sqrt(2*D_rot*self.dt)*self.x_wiener[step_num] #- self.velocity*(self.F[0])
+        y_new = self.pos[1] + self.velocity*self.status*np.sin(np.deg2rad(self.ang))*self.dt#+np.sqrt(2*D_rot*self.dt)*self.y_wiener[step_num]#- self.velocity*(self.F[1])
         new_pos = [x_new[0], y_new[0]]
 
         new_pos = self.checkCollision(new_pos)
@@ -247,45 +253,70 @@ class Bacteria(Agent):
         #if bacteria have just doubled reset the doubling timer 
         if self.next_double < self.dt:
             self.next_double = np.random.normal(doubling_mean, doubling_std, 1)
-        
+
+
+        #heap of debugging lines
+        #print('run duration: '+str(self.duration))
+        #print('run timer: '+str(self.timer))
+        #print('status: '+str(self.status))
+        #print('angle: '+str(self.ang))
+        #print('velocity: '+str(self.velocity))
+        #print('')
+
 	#check whether the duration is up
         if self.timer >= self.duration:
 
             # reset collision variable
-            self.F = [0, 0]
+            self.F = [1, 1]
 
             #if currently tumbling change to run
             if self.status == 0:
                 self.status = 1
                 #generate a new running angle
-                self.ang = self.getAngle(self.ang_mean, self.ang_std)
+                self.ang = (self.getAngle(self.ang_mean, self.ang_std) + self.ang) % 360
                 #get the duration of the next run
                 self.duration = self.getDuration(self.mean_run)
                 #get the wiener processes for the next run
                 #generate for 10 seconds in case the run is extended
                 self.x_wiener = self.wienerProcess(20, self.dt)
                 self.y_wiener = self.wienerProcess(20, self.dt)
+                self.velocity = np.random.normal(velocity_mean, velocity_std, 1)
 
             #if currently running see if running in the direction of nutrients
-            elif self.status == 1:
+            #elif self.status == 1:
 
                 #get the concentration of attractant and update start and end
-                current_conc = self.getConcentration()
+                #current_conc = self.getConcentration()
                 #current_conc = self.pos[0] #debugging just use x coordinate
-                self.c_start = self.c_end
-                self.c_end = current_conc
+                #self.c_start = self.c_end
+                #self.c_end = current_conc
 
                 #if moving in the direction of nutrients continue to run
-                if self.c_end > self.c_start:
+                #if self.c_end > self.c_start:
 
                     #if not located along a wall
-                    if new_pos[0]!= 0 and new_pos[0] != model_width-epsilon and new_pos[1] != 0 and new_pos[1] != model_height-epsilon:
+                    #if new_pos[0]!= 0 and new_pos[0] != model_width-epsilon and new_pos[1] != 0 and new_pos[1] != model_height-epsilon:
                         #generate a duration for the next run
-                        self.duration = alpha*self.getDuration(self.mean_run)
+                    #self.duration = alpha*self.getDuration(self.mean_run)
                         #don't update the angle or wiener proccess as continuing in same direction
 
+            #if its not tumbling its either extending or running
+            else:
+
+                if self.status != 2:
+                    #if not biasing movement already see if it can be biased
+                    #current_conc = self.pos[0]
+                    current_conc = self.getConcentration()
+                    self.c_start = self.c_end
+                    self.c_end = current_conc
+
+                    if self.c_end > self.c_start:
+                        self.duration = alpha * self.getDuration(self.mean_run)
+                        self.status = 2
+
                 else:
-                    #if moving in a 'bad' direction tumble
+
+                    #if biasing already it is time to tumble
                     self.status = 0
                     #get the duration of the tumble
                     self.duration = self.getDuration(self.mean_tumble)

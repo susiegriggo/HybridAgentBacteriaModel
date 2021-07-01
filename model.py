@@ -48,13 +48,13 @@ class Tube(Model):
 		self.width = width
 		self.height = height
 		self.name = name
-		self.dx = 0.005 #size of grid increments
+		self.dx = 0.0001 #size of grid increments
 		self.dt = 0.1 #length of the timesteps in the model
 		self.nx = int(width/self.dx) #number of increments in x direction
 		self.ny = int(height/self.dx) #number of increments in y direction
 		self.ticks = 0 #count the number of ticks which have elapsed
 		self.schedule = RandomActivation(self)
-		self.space = ContinuousSpace(width, height, False)
+		self.space = ContinuousSpace(width, height, True)
 		self.make_agents()
 		self.running = True 
 
@@ -62,7 +62,7 @@ class Tube(Model):
 		self.D_star = (D_c*tau)/(L*L)
 		self.c_star = 1
 		self.beta_star = (beta*p_inf*tau)/(c_0*self.width*self.height)
-		self.beta_star = 1E-5 #practise placeholder parameter
+		self.beta_star = 1E-8#practise placeholder parameter
 
 		#generate grid to solve the concentration over 
 		self.u0 = self.c_star * np.ones((self.nx+1, self.ny+1)) #starting concentration of bacteria
@@ -79,7 +79,7 @@ class Tube(Model):
 			x = 0
 			y = self.height/2
 
-			pos = np.array((0.3, y))
+			pos = np.array((0.00035, y))
 
 			bacteria = Bacteria(
 				i,
@@ -182,11 +182,11 @@ class Tube(Model):
 
 		#have the concentration save to a file such that it can be read by the agents
 		u_df = pd.DataFrame(self.u)
-		conc_file = str(self.name) + '_concentration_field.csv'
+		conc_file = 'concentration_field.csv'
 		u_df.to_csv(conc_file, index = False)
 
 		dens_df = pd.DataFrame(bacterial_density)
-		dens_file = str(self.name) + '_density_field.csv'
+		dens_file = 'density_field.csv'
 		dens_df.to_csv(dens_file, index = False )
 
 		#save updated versions of the density and concentration periodically
