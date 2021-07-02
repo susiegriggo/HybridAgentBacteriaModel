@@ -13,6 +13,7 @@ radius = 10E-4  # cm
 #f_sphere = 8 * np.pi * vis * radius  # frictional drag coefficient for a sphere
 #D_rot = (K * T) / f_sphere
 D_rot = 0.062 #rational diffusion coefficient radians^2/s
+D_rot = D_rot *10E-9
 epsilon = 10E-10 #adjusts edges of the modelling space
 
 alpha =  2 #bias of the bacteria to the nutrients it is consuming
@@ -21,6 +22,7 @@ doubling_std = 120
 doubling_mean = 360
 doubling_std = 20
 velocity_mean = 2.41E-3 #mean velocity in cm/s
+#velocity_mean = 24.1  #velocity in microns
 #velocity_std = 6.8E-8
 velocity_std = 0
 
@@ -64,7 +66,12 @@ class Bacteria(Agent):
         self.dt = 0.01 #time for each tick in the simulation
         self.timer = 0  #traces where up to on the current run/tumble
         self.ang = 0 # angle for running
+
+        #wiener process for rotational diffusion
         self.x_wiener = self.wienerProcess(20, self.dt)
+        self.W_x = np.sqrt(self.dt) * np.random.normal(0, 1, 1)
+        self.W_y = np.sqrt(self.dt) * np.random.normal(0, 1, 1)
+
         self.y_wiener = self.wienerProcess(20, self.dt)
         self.c_start = 0 #concentration of attractant at the start of the run
         self.c_end = 0 #concentration of attractant at the end of the run
@@ -121,22 +128,43 @@ class Bacteria(Agent):
 
         return dur
 
-    def wienerProcess(self, T, dt):
-        """
-        Used to simulate Brownian motion
-        dt - tick time
-        T - number of seconds to generate the Wiener process
-        :return:
-        """
+    #def wienerProcess(self, T, dt):
+    #    """
+    #    Used to simulate Brownian motion
+    #    dt - tick time
+    #    T - number of seconds to generate the Wiener process
+    #    :return:
+    #    """
 
-        #number of discrete timesteps
+     #   #number of discrete timesteps
+     #   N = int(T/dt)
+
+     #   random_increments = np.random.normal(0, 1, N)*np.sqrt(dt) #the epsilon values
+     #   wiener_process = np.cumsum(random_increments) #calculate the wiener process
+     #   wiener_process = np.insert(wiener_process, 0, 0) #insert the intial condition
+
+     #   return wiener_process
+
+    def wienerProcess(self, T, dt):
+
+
+        T = 1
         N = int(T/dt)
 
-        random_increments = np.random.normal(0, 1, N)*np.sqrt(dt) #the epsilon values
-        wiener_process = np.cumsum(random_increments) #calculate the wiener process
-        wiener_process = np.insert(wiener_process, 0, 0) #insert the intial condition
+        # preallocate arrays for efficency
+        dW = np.zeros((1, N))
+        W = np.zeros((1, N))
 
-        return wiener_process
+        # intialise the first approximation
+        dW[0, 0] = np.sqrt(dt) * np.random.normal(0, 1, 1)
+        W[0, 0] = dW[0, 0]
+
+        # loop
+        for j in range(1, N):
+            dW[0, j] = np.sqrt(dt) * np.random.normal(0, 1, 1)
+            W[0, j] = W[0, j - 1] + dW[0, j]
+
+        return W
 
     def checkCollision(self, pos):
         """
@@ -237,9 +265,6 @@ class Bacteria(Agent):
         round_dx = np.log10(conc_dx)*-1
         round_dy = np.log10(conc_dy)*-1
 
-        #round the agents position
-        #rounded_pos = [round(self.pos[0],int(round_dx)), round(self.pos[1], int(round_dy))]
-
         #get the concentration corresponding to this rounded concetration
         field_pos = [int(round(self.pos[0],int(round_dx))/conc_dx), int(round(self.pos[1], int(round_dy))/conc_dy)]
 
@@ -275,8 +300,8 @@ class Bacteria(Agent):
         self.neighbourCollide()
         #get the current timestep in the run/tumble
         step_num = int(self.timer/self.dt)
-        x_new = self.pos[0] + self.velocity*self.status*np.cos(np.deg2rad(self.ang))*self.dt#+np.sqrt(2*D_rot*self.dt)*self.x_wiener[step_num] #- self.velocity*(self.F[0])
-        y_new = self.pos[1] + self.velocity*self.status*np.sin(np.deg2rad(self.ang))*self.dt#+np.sqrt(2*D_rot*self.dt)*self.y_wiener[step_num]#- self.velocity*(self.F[1])
+        x_new = self.pos[0] + self.velocity*self.status*np.cos(np.deg2rad(self.ang))*self.dt+np.sqrt(2*D_rot*self.dt)*self.W_x
+        y_new = self.pos[1] + self.velocity*self.status*np.sin(np.deg2rad(self.ang))*self.dt+np.sqrt(2*D_rot*self.dt)*self.W_y
         new_pos = [x_new[0], y_new[0]]
 
         new_pos = self.checkCollision(new_pos)
@@ -291,7 +316,13 @@ class Bacteria(Agent):
         #if bacteria have just doubled reset the doubling timer 
         if self.next_double < self.dt:
             self.next_double = np.random.normal(doubling_mean, doubling_std, 1)
-        #heap of debugging lines
+
+        #update the wiener processes for rotational diffusion
+        self.W_x = self.W_x + np.sqrt(self.dt) * np.random.normal(0,1,1)
+        self.W_y = self.W_y + np.sqrt(self.dt) * np.random.normal(0,1,1)
+
+
+        #hdebugging lines which can be uncommented
         #print('run duration: '+str(self.duration))
         #print('run timer: '+str(self.timer))
         #print('status: '+str(self.status))
@@ -302,9 +333,6 @@ class Bacteria(Agent):
 	#check whether the duration is up
         if self.timer >= self.duration:
 
-            # reset collision variable
-            self.F = [1, 1]
-
             #if currently tumbling change to run
             if self.status == 0:
                 self.status = 1
@@ -314,27 +342,9 @@ class Bacteria(Agent):
                 self.duration = self.getDuration(self.mean_run)
                 #get the wiener processes for the next run
                 #generate for 10 seconds in case the run is extended
-                self.x_wiener = self.wienerProcess(20, self.dt)
-                self.y_wiener = self.wienerProcess(20, self.dt)
+                self.x_wiener = self.wienerProcess(10, self.dt)
+                self.y_wiener = self.wienerProcess(10, self.dt)
                 self.velocity = np.random.normal(velocity_mean, velocity_std, 1)
-
-            #if currently running see if running in the direction of nutrients
-            #elif self.status == 1:
-
-                #get the concentration of attractant and update start and end
-                #current_conc = self.getConcentration()
-                #current_conc = self.pos[0] #debugging just use x coordinate
-                #self.c_start = self.c_end
-                #self.c_end = current_conc
-
-                #if moving in the direction of nutrients continue to run
-                #if self.c_end > self.c_start:
-
-                    #if not located along a wall
-                    #if new_pos[0]!= 0 and new_pos[0] != model_width-epsilon and new_pos[1] != 0 and new_pos[1] != model_height-epsilon:
-                        #generate a duration for the next run
-                    #self.duration = alpha*self.getDuration(self.mean_run)
-                        #don't update the angle or wiener proccess as continuing in same direction
 
             #if its not tumbling its either extending or running
             else:
