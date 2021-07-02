@@ -48,8 +48,8 @@ class Tube(Model):
 		self.width = width
 		self.height = height
 		self.name = name
-		self.dx = 0.0001 #size of grid increments
-		self.dt = 0.1 #length of the timesteps in the model
+		self.dx = 0.01 #size of grid increments
+		self.dt = 0.01 #length of the timesteps in the model
 		self.nx = int(width/self.dx) #number of increments in x direction
 		self.ny = int(height/self.dx) #number of increments in y direction
 		self.ticks = 0 #count the number of ticks which have elapsed
@@ -182,15 +182,15 @@ class Tube(Model):
 
 		#have the concentration save to a file such that it can be read by the agents
 		u_df = pd.DataFrame(self.u)
-		conc_file = 'concentration_field.csv'
-		u_df.to_csv(conc_file, index = False)
+		#conc_file = 'concentration_field.csv'
+		#u_df.to_csv(conc_file, index = False)
 
 		dens_df = pd.DataFrame(bacterial_density)
-		dens_file = 'density_field.csv'
-		dens_df.to_csv(dens_file, index = False )
+		#dens_file = 'density_field.csv'
+		#dens_df.to_csv(dens_file, index = False )
 
 		#save updated versions of the density and concentration periodically
-		if self.ticks % 50 == 0: #save every 50 ticks (i.e every 5 seconds)
+		if self.ticks % 100 == 0: #save every 100 ticks (i.e every 5 seconds)
 			concfield_name = str(self.name)+'_concentration_field_'+str(self.ticks) + "_ticks.csv"
 			densfield_name = str(self.name)+'_density_field_' +str(self.ticks) + "_ticks.csv"
 			u_df.to_csv(concfield_name, index = False)

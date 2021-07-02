@@ -4,14 +4,7 @@ import pandas as pd
 
 from mesa import Agent
 
-# calculate the rotational diffusion coefficient
-# calculated as a sphere representing E. coli
-#K = 1.38E-23  # Boltzman's coefficient
-#T = 298  # temperature in kelvin
-#vis = 0.027  # g/cm viscosity
 radius = 10E-4  # cm
-#f_sphere = 8 * np.pi * vis * radius  # frictional drag coefficient for a sphere
-#D_rot = (K * T) / f_sphere
 D_rot = 0.062 #rational diffusion coefficient radians^2/s
 D_rot = D_rot *10E-9
 epsilon = 10E-10 #adjusts edges of the modelling space
@@ -21,9 +14,10 @@ doubling_mean = 27000
 doubling_std = 120
 doubling_mean = 360
 doubling_std = 20
+doubling_mean = 1
+doubling_std = 0
+
 velocity_mean = 2.41E-3 #mean velocity in cm/s
-#velocity_mean = 24.1  #velocity in microns
-#velocity_std = 6.8E-8
 velocity_std = 0
 
 #wall effects
@@ -44,7 +38,7 @@ class Bacteria(Agent):
         pos,
         width,
         height,
-        doubling,
+        daughter,
     ):
         """
         Create a new Bacteria
@@ -52,6 +46,9 @@ class Bacteria(Agent):
         Args:
             unique_id: Unique agent identifier.
             pos: Starting position
+            width: size of the modelling space
+            height: size fo the modelling space
+            daughter: True/False of whether bacteria is a daughter cell of a cell in the model
 
         """
         super().__init__(unique_id, model)
@@ -61,27 +58,24 @@ class Bacteria(Agent):
         self.velocity = np.random.normal(velocity_mean, velocity_std, 1)
         self.mean_run = 1
         self.mean_tumble = 0.1
-        self.status = 0 #determines whether running or tumbling. 0 is tumbling, 1 is running
+        self.status = 0 #determines whether running or tumbling. 0 is tumbling, 1 is running, 2 is extending a run
         self.duration = self.getDuration(self.mean_tumble) #stores the time of the duration
         self.dt = 0.01 #time for each tick in the simulation
         self.timer = 0  #traces where up to on the current run/tumble
         self.ang = 0 # angle for running
 
         #wiener process for rotational diffusion
-        self.x_wiener = self.wienerProcess(20, self.dt)
         self.W_x = np.sqrt(self.dt) * np.random.normal(0, 1, 1)
         self.W_y = np.sqrt(self.dt) * np.random.normal(0, 1, 1)
-
-        self.y_wiener = self.wienerProcess(20, self.dt)
         self.c_start = 0 #concentration of attractant at the start of the run
         self.c_end = 0 #concentration of attractant at the end of the run
 
-        if doubling == False:
-            self.next_double = np.random.uniform(0,doubling_mean, 1) #select the reproduction rate from a uniform distribution
-        else:
-            self.next_double = np.random.normal(doubling_mean, doubling_std, 1)
 
-        self.F = [1,1] #variable which when not zero represents bacteria colliding with wall
+        self.next_double = np.random.normal(doubling_mean, doubling_std, 1)
+
+        if daughter == False:
+            #if the bacteria is new it could be anywhere in its growth cycle
+            self.next_double = np.random.uniform(0, self.next_double,1)
 
         global model_width
         global model_height
@@ -127,44 +121,6 @@ class Bacteria(Agent):
         dur = (-1)*mean_t*np.log(p)
 
         return dur
-
-    #def wienerProcess(self, T, dt):
-    #    """
-    #    Used to simulate Brownian motion
-    #    dt - tick time
-    #    T - number of seconds to generate the Wiener process
-    #    :return:
-    #    """
-
-     #   #number of discrete timesteps
-     #   N = int(T/dt)
-
-     #   random_increments = np.random.normal(0, 1, N)*np.sqrt(dt) #the epsilon values
-     #   wiener_process = np.cumsum(random_increments) #calculate the wiener process
-     #   wiener_process = np.insert(wiener_process, 0, 0) #insert the intial condition
-
-     #   return wiener_process
-
-    def wienerProcess(self, T, dt):
-
-
-        T = 1
-        N = int(T/dt)
-
-        # preallocate arrays for efficency
-        dW = np.zeros((1, N))
-        W = np.zeros((1, N))
-
-        # intialise the first approximation
-        dW[0, 0] = np.sqrt(dt) * np.random.normal(0, 1, 1)
-        W[0, 0] = dW[0, 0]
-
-        # loop
-        for j in range(1, N):
-            dW[0, j] = np.sqrt(dt) * np.random.normal(0, 1, 1)
-            W[0, j] = W[0, j - 1] + dW[0, j]
-
-        return W
 
     def checkCollision(self, pos):
         """
@@ -296,12 +252,16 @@ class Bacteria(Agent):
         Move the bacteria accordingly
         """
 
+        #if bacteria have just doubled reset the doubling timer
+        if self.next_double < self.dt:
+            self.next_double = np.random.normal(doubling_mean, doubling_std, 1)
+
         #check if the bacteria is about to collide
         self.neighbourCollide()
         #get the current timestep in the run/tumble
         step_num = int(self.timer/self.dt)
-        x_new = self.pos[0] + self.velocity*self.status*np.cos(np.deg2rad(self.ang))*self.dt+np.sqrt(2*D_rot*self.dt)*self.W_x
-        y_new = self.pos[1] + self.velocity*self.status*np.sin(np.deg2rad(self.ang))*self.dt+np.sqrt(2*D_rot*self.dt)*self.W_y
+        x_new = self.pos[0] + self.velocity*self.status*np.cos(np.deg2rad(self.ang))*self.dt#+np.sqrt(2*D_rot*self.dt)*self.W_x
+        y_new = self.pos[1] + self.velocity*self.status*np.sin(np.deg2rad(self.ang))*self.dt#+np.sqrt(2*D_rot*self.dt)*self.W_y
         new_pos = [x_new[0], y_new[0]]
 
         new_pos = self.checkCollision(new_pos)
@@ -312,10 +272,6 @@ class Bacteria(Agent):
         self.timer = self.timer + self.dt
         #update the time until the next double
         self.next_double = self.next_double - self.dt
-
-        #if bacteria have just doubled reset the doubling timer 
-        if self.next_double < self.dt:
-            self.next_double = np.random.normal(doubling_mean, doubling_std, 1)
 
         #update the wiener processes for rotational diffusion
         self.W_x = self.W_x + np.sqrt(self.dt) * np.random.normal(0,1,1)
@@ -340,10 +296,6 @@ class Bacteria(Agent):
                 self.ang = (self.getAngle(self.ang_mean, self.ang_std) + self.ang) % 360
                 #get the duration of the next run
                 self.duration = self.getDuration(self.mean_run)
-                #get the wiener processes for the next run
-                #generate for 10 seconds in case the run is extended
-                self.x_wiener = self.wienerProcess(10, self.dt)
-                self.y_wiener = self.wienerProcess(10, self.dt)
                 self.velocity = np.random.normal(velocity_mean, velocity_std, 1)
 
             #if its not tumbling its either extending or running
