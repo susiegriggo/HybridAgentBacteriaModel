@@ -68,6 +68,9 @@ class Tube(Model):
 		self.u0 = self.c_star * np.ones((self.nx+1, self.ny+1)) #starting concentration of bacteria
 		self.u = self.u0.copy() #current concentration of bacteria - updating through each timestep
 
+		#store the location of the band at each timepoint
+		self.band_location = []  # intialise list to store the location of the band at each dt
+
 	def make_agents(self):
 
 		"""
@@ -195,6 +198,31 @@ class Tube(Model):
 			densfield_name = str(self.name)+'_density_field_' +str(self.ticks) + "_ticks.csv"
 			u_df.to_csv(concfield_name, index = False)
 			dens_df.to_csv(densfield_name, index = False)
+
+		#update band location with the current location of the chemotaxis band
+		#TODO regulate at which timepoints this is updated
+		self.detectBand(dens_df)
+		#save the band density
+		band_name = str(self.name) + '_band_location_'+str(self.ticks)+"_ticks.csv"
+		band_df = pd.DataFrame({'time': [dt*i for i in range(0,self.ticks)], "distance (cm)": self.population})
+		band_df.to_csv(band_name, index = False)
+
+	def detectBand(self, dens_df):
+		"""
+		Detect the band in the tube by evaluating the mean bacterial density across each row
+		:return:
+		"""
+		dens_df = dens_df.T
+		col_means = dens_df.values.mean(axis=0)
+
+		#get the column with the maximum density
+		max_dens_dx = np.where(col_means == np.amax(col_means))
+
+		#get the location relative to the size of the tube
+		max_dens_loc = max_dens_dx[0][0] * self.dx
+
+		#update the list of band locations
+		self.band_location.append(max_dens_loc)
 
 	def step(self):
 		self.schedule.step()
