@@ -1,29 +1,31 @@
+"""
+Creates a bacteria object which can be added to a tube model
+"""
 import numpy as np
 import random
 import pandas as pd
-
 from mesa import Agent
 
 radius = 10E-4  # cm
 D_rot = 0.062 #rational diffusion coefficient radians^2/s
-D_rot = D_rot *10E-9
+D_rot = D_rot*10E-9 #change the units to cm
 epsilon = 10E-10 #adjusts edges of the modelling space
 
-alpha =  2 #bias of the bacteria to the nutrients it is consuming
-doubling_mean = 27000
-doubling_std = 120
-doubling_mean = 360
-doubling_std = 20
-doubling_mean = 1
+alpha =  0.5  #bias of the bacteria to the nutrients it is consuming based on the previous run duration
+#doubling_mean = 360
+doubling_mean = 10E+26
 doubling_std = 0
+#doubling_std = 20
 
 velocity_mean = 2.41E-3 #mean velocity in cm/s
-velocity_std = 0
+velocity_std = 6E-4 #standrd deviation of the velocity
 
 #wall effects
-arch_collision = 0.5 #probability of an arch collision
+arch_collision = 1 #probability of an arch collision
 tangent_collision = 1 - arch_collision #probability of a tangential deflection collision
 
+#list of positions
+pos_list =[]
 
 class Bacteria(Agent):
     """
@@ -49,8 +51,8 @@ class Bacteria(Agent):
             width: size of the modelling space
             height: size fo the modelling space
             daughter: True/False of whether bacteria is a daughter cell of a cell in the model
-
         """
+
         super().__init__(unique_id, model)
         self.pos = np.array(pos)
         self.ang_mean = 68
@@ -63,6 +65,7 @@ class Bacteria(Agent):
         self.dt = 0.01 #time for each tick in the simulation
         self.timer = 0  #traces where up to on the current run/tumble
         self.ang = 0 # angle for running
+        self.step_counter = 0 #count the number of steps the agent has done
 
         #wiener process for rotational diffusion
         self.W_x = np.sqrt(self.dt) * np.random.normal(0, 1, 1)
@@ -147,12 +150,12 @@ class Bacteria(Agent):
 
             p = random.uniform(0, 1)
 
-            if p < arch_collision:
-                self.status = 0
-                self.timer = 0
-                self.duration = self.getDuration(self.mean_tumble)
+            #if p < arch_collision:
+                #self.status = 0
+                #self.timer = 0
+                #self.duration = self.getDuration(self.mean_tumble)
 
-            else:
+            if p > arch_collision:
             #tangental
                 self.ang = self.ang+90
 
@@ -162,12 +165,12 @@ class Bacteria(Agent):
 
             p = random.uniform(0, 1)
 
-            if p < arch_collision:
-                self.status = 0
-                self.timer = 0
-                self.duration = self.getDuration(self.mean_tumble)
+            #if p < arch_collision:
+                #self.status = 0
+                #self.timer = 0
+                #self.duration = self.getDuration(self.mean_tumble)
 
-            else:
+            if p > arch_collision:
             #tangental
                 self.ang = self.ang+90
 
@@ -177,12 +180,12 @@ class Bacteria(Agent):
 
             p = random.uniform(0, 1)
 
-            if p < arch_collision:
-                self.status = 0
-                self.timer = 0
-                self.duration = self.getDuration(self.mean_tumble)
+            #if p < arch_collision:
+                #self.status = 0
+                #self.timer = 0
+                #self.duration = self.getDuration(self.mean_tumble)
 
-            else:
+            if p > arch_collision:
             #tangental
                 self.ang = self.ang+90
 
@@ -192,12 +195,12 @@ class Bacteria(Agent):
 
             p = random.uniform(0, 1)
 
-            if p < arch_collision:
-                self.status = 0
-                self.timer = 0
-                self.duration = self.getDuration(self.mean_tumble)
+            #if p < arch_collision:
+                #self.status = 0
+                #self.timer = 0
+                #self.duration = self.getDuration(self.mean_tumble)
 
-            else:
+            if p > arch_collision:
             #tangental
                 self.ang = self.ang+90
 
@@ -235,7 +238,7 @@ class Bacteria(Agent):
         """
 
         #get the neighbours of the bacteria
-        vision = 10E-8 #vision is the radius of the bacteria
+        vision = radius #vision is the radius of the bacteria
         colliders = self.model.space.get_neighbors(self.pos, vision, False)
 
         if len(colliders) > 0:
@@ -260,8 +263,8 @@ class Bacteria(Agent):
         self.neighbourCollide()
         #get the current timestep in the run/tumble
         step_num = int(self.timer/self.dt)
-        x_new = self.pos[0] + self.velocity*self.status*np.cos(np.deg2rad(self.ang))*self.dt#+np.sqrt(2*D_rot*self.dt)*self.W_x
-        y_new = self.pos[1] + self.velocity*self.status*np.sin(np.deg2rad(self.ang))*self.dt#+np.sqrt(2*D_rot*self.dt)*self.W_y
+        x_new = self.pos[0] + self.velocity*self.status*np.cos(np.deg2rad(self.ang))*self.dt+np.sqrt(2*D_rot*self.dt)*self.W_x
+        y_new = self.pos[1] + self.velocity*self.status*np.sin(np.deg2rad(self.ang))*self.dt+np.sqrt(2*D_rot*self.dt)*self.W_y
         new_pos = [x_new[0], y_new[0]]
 
         new_pos = self.checkCollision(new_pos)
@@ -277,6 +280,14 @@ class Bacteria(Agent):
         self.W_x = self.W_x + np.sqrt(self.dt) * np.random.normal(0,1,1)
         self.W_y = self.W_y + np.sqrt(self.dt) * np.random.normal(0,1,1)
 
+        #save the positions to a file
+        self.step_counter = self.step_counter + 1
+        pos_list.append(self.pos)
+
+        #save only every 10 second
+        if self.step_counter % 1000 == 0:
+            pos_df = pd.DataFrame({'position': pos_list})
+            pos_df .to_csv('example_position_list4.csv', index = False)
 
         #hdebugging lines which can be uncommented
         #print('run duration: '+str(self.duration))
@@ -309,7 +320,7 @@ class Bacteria(Agent):
                     self.c_end = current_conc
 
                     if self.c_end > self.c_start:
-                        self.duration = alpha * self.getDuration(self.mean_run)
+                        self.duration = alpha * self.duration
                         self.status = 2
 
                 else:

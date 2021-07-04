@@ -49,7 +49,7 @@ class Tube(Model):
 		self.height = height
 		self.name = name
 		self.dx = 0.01 #size of grid increments
-		self.dt = 0.01 #length of the timesteps in the model
+		self.dt = 0.01 #size of time increments
 		self.nx = int(width/self.dx) #number of increments in x direction
 		self.ny = int(height/self.dx) #number of increments in y direction
 		self.ticks = 0 #count the number of ticks which have elapsed
@@ -58,7 +58,7 @@ class Tube(Model):
 		self.make_agents()
 		self.running = True 
 
-		#calculate the values for non-dimensionalised parameters
+		#calculate the values for dimensionless parameters
 		self.D_star = (D_c*tau)/(L*L)
 		self.c_star = 1
 		self.beta_star = (beta*p_inf*tau)/(c_0*self.width*self.height)
@@ -83,6 +83,7 @@ class Tube(Model):
 			y = self.height/2
 
 			pos = np.array((0.00035, y))
+			pos = np.array((0.5, 0.5))
 
 			bacteria = Bacteria(
 				i,
@@ -174,7 +175,6 @@ class Tube(Model):
 		#get the gaussian density kernel of the bacteria
 		bacterial_density = self.densityKernel().T
 
-
 		self.u[1:-1, 1:-1] = self.u0[1:-1, 1:-1] + self.D_star * self.dt * ((self.u0[2:, 1:-1] - 2 * self.u0[1:-1, 1:-1] + self.u0[:-2, 1:-1]) / dx2 + (
 						self.u0[1:-1, 2:] - 2 * self.u0[1:-1, 1:-1] + self.u0[1:-1, :-2]) / dy2) - self.dt * self.beta_star *self.population*bacterial_density[1:-1, 1:-1]
 
@@ -204,7 +204,7 @@ class Tube(Model):
 		self.detectBand(dens_df)
 		#save the band density
 		band_name = str(self.name) + '_band_location_'+str(self.ticks)+"_ticks.csv"
-		band_df = pd.DataFrame({'time': [dt*i for i in range(0,self.ticks)], "distance (cm)": self.population})
+		band_df = pd.DataFrame({'time': [self.dt*i for i in range(0,self.ticks)], "distance (cm)": self.population})
 		band_df.to_csv(band_name, index = False)
 
 	def detectBand(self, dens_df):
@@ -226,20 +226,11 @@ class Tube(Model):
 
 	def step(self):
 		self.schedule.step()
-		self.stepConcentration()
+		#self.stepConcentration()
 		self.bacteriaReproduce()
 		#update the number of ticks which have occured
 		self.ticks = self.ticks + 1
 
-def kernel(value, std):
-	"""
-	Calculate the Gaussian kernel given a dataframe and standard deviation
-	:param value:
-	:param std:
-	:return:
-	"""
-	K = (1/(np.sqrt(2*np.pi*std*std)))*np.exp((-value*value)/(2*std*std))
-	return K
 
 
 
