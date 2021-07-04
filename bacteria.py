@@ -21,7 +21,7 @@ velocity_mean = 2.41E-3 #mean velocity in cm/s
 velocity_std = 6E-4 #standrd deviation of the velocity
 
 #wall effects
-arch_collision = 1 #probability of an arch collision
+arch_collision = 0 #probability of an arch collision
 tangent_collision = 1 - arch_collision #probability of a tangential deflection collision
 
 #list of positions
@@ -280,7 +280,10 @@ class Bacteria(Agent):
         self.W_x = self.W_x + np.sqrt(self.dt) * np.random.normal(0,1,1)
         self.W_y = self.W_y + np.sqrt(self.dt) * np.random.normal(0,1,1)
 
-        #save the positions to a file
+
+	#uncomment for the figure with the run and tumble movement pattern 
+        '''
+	#save the positions to a file
         self.step_counter = self.step_counter + 1
         pos_list.append(self.pos)
 
@@ -288,6 +291,7 @@ class Bacteria(Agent):
         if self.step_counter % 1000 == 0:
             pos_df = pd.DataFrame({'position': pos_list})
             pos_df .to_csv('example_position_list4.csv', index = False)
+	'''
 
         #hdebugging lines which can be uncommented
         #print('run duration: '+str(self.duration))
@@ -332,11 +336,6 @@ class Bacteria(Agent):
 
             #reset timer
             self.timer = 0
-
-
-
-
-
 
 
 

@@ -13,10 +13,12 @@ parser.add_argument( "-s", "--steps", help = 'number of steps for the model to p
 parser.add_argument("-n", "--name", help = 'prefix of the output files', type = str)
 args = parser.parse_args()
 
+print('STARTING SIMULATION')
+
 model = Tube(args.population, args.width, args.height, args.name)
 for i in range(args.steps):
     model.step()
-    print('step: '+str(i+1))
+    print('step: '+str(i+1), flush = True)
 
 #print a summary
 print('COMPLETE')

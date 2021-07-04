@@ -6,10 +6,8 @@
 
 # How many tasks and processes. Generally set tasks to 1 and cpus-per-task to number of threads you call
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=10
+#SBATCH --cpus-per-task=50
+#SBATCH --mem-per-cpu=16GB
 
-# How much memory. I usually request 2000M (2 GB) if I am not sure
-#SBATCH --mem=32000M
-
-python server.py -w 20 -he 1 -p 1000 -s 1000
+python server.py -w 1 -he 0.1 -p 1000 -s 20000  -n test1
 
