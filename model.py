@@ -67,6 +67,7 @@ class Tube(Model):
 		#generate grid to solve the concentration over 
 		self.u0 = self.c_star * np.ones((self.nx+1, self.ny+1)) #starting concentration of bacteria
 		self.u = self.u0.copy() #current concentration of bacteria - updating through each timestep
+		self.dens = None #placeholder for the density kernel
 
 		#store the location of the band at each timepoint
 		self.band_location = []  # intialise list to store the location of the band at each dt
@@ -173,10 +174,10 @@ class Tube(Model):
 		dx2, dy2 = self.dx * self.dx, self.dx * self.dx
 
 		#get the gaussian density kernel of the bacteria
-		bacterial_density = self.densityKernel().T
+		self.dens = self.densityKernel().T
 
 		self.u[1:-1, 1:-1] = self.u0[1:-1, 1:-1] + self.D_star * self.dt * ((self.u0[2:, 1:-1] - 2 * self.u0[1:-1, 1:-1] + self.u0[:-2, 1:-1]) / dx2 + (
-						self.u0[1:-1, 2:] - 2 * self.u0[1:-1, 1:-1] + self.u0[1:-1, :-2]) / dy2) - self.dt * self.beta_star *self.population*bacterial_density[1:-1, 1:-1]
+						self.u0[1:-1, 2:] - 2 * self.u0[1:-1, 1:-1] + self.u0[1:-1, :-2]) / dy2) - self.dt * self.beta_star *self.population*self.dens[1:-1, 1:-1]
 
 		# set such that the concentration cannot be lowered below zero
 		self.u[self.u < 0] = 0
@@ -188,7 +189,7 @@ class Tube(Model):
 		#conc_file = 'concentration_field.csv'
 		#u_df.to_csv(conc_file, index = False)
 
-		dens_df = pd.DataFrame(bacterial_density)
+		dens_df = pd.DataFrame(self.dens)
 		#dens_file = 'density_field.csv'
 		#dens_df.to_csv(dens_file, index = False )
 
@@ -226,10 +227,16 @@ class Tube(Model):
 
 	def step(self):
 		self.schedule.step()
-		#self.stepConcentration()
+		self.stepConcentration()
 		self.bacteriaReproduce()
 		#update the number of ticks which have occured
 		self.ticks = self.ticks + 1
+
+def compute_density(model):
+	return model.dens
+
+def compute_concentration(model):
+	return model.u
 
 
 
