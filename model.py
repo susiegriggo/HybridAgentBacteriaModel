@@ -50,6 +50,7 @@ class Tube(Model):
 		self.name = name
 		self.dx = 0.01 #size of grid increments
 		self.dt = 0.01 #length of the timesteps in the model
+		self.dt = 0.01 #size of time increments
 		self.nx = int(width/self.dx) #number of increments in x direction
 		self.ny = int(height/self.dx) #number of increments in y direction
 		self.ticks = 0 #count the number of ticks which have elapsed
@@ -58,7 +59,7 @@ class Tube(Model):
 		self.make_agents()
 		self.running = True 
 
-		#calculate the values for non-dimensionalised parameters
+		#calculate the values for dimensionless parameters
 		self.D_star = (D_c*tau)/(L*L)
 		self.c_star = 1
 		self.beta_star = (beta*p_inf*tau)/(c_0*self.width*self.height)
@@ -67,6 +68,9 @@ class Tube(Model):
 		#generate grid to solve the concentration over 
 		self.u0 = self.c_star * np.ones((self.nx+1, self.ny+1)) #starting concentration of bacteria
 		self.u = self.u0.copy() #current concentration of bacteria - updating through each timestep
+
+		#store the location of the band at each timepoint
+		self.band_location = []  # intialise list to store the location of the band at each dt
 
 	def make_agents(self):
 
@@ -80,6 +84,7 @@ class Tube(Model):
 			y = self.height/2
 
 			pos = np.array((0.00035, y))
+			pos = np.array((0.5, 0.5))
 
 			bacteria = Bacteria(
 				i,
@@ -171,7 +176,6 @@ class Tube(Model):
 		#get the gaussian density kernel of the bacteria
 		bacterial_density = self.densityKernel().T
 
-
 		self.u[1:-1, 1:-1] = self.u0[1:-1, 1:-1] + self.D_star * self.dt * ((self.u0[2:, 1:-1] - 2 * self.u0[1:-1, 1:-1] + self.u0[:-2, 1:-1]) / dx2 + (
 						self.u0[1:-1, 2:] - 2 * self.u0[1:-1, 1:-1] + self.u0[1:-1, :-2]) / dy2) - self.dt * self.beta_star *self.population*bacterial_density[1:-1, 1:-1]
 
@@ -182,36 +186,52 @@ class Tube(Model):
 
 		#have the concentration save to a file such that it can be read by the agents
 		u_df = pd.DataFrame(self.u)
-		conc_file = 'concentration_field.csv'
-		u_df.to_csv(conc_file, index = False)
+		#conc_file = 'concentration_field.csv'
+		#u_df.to_csv(conc_file, index = False)
 
 		dens_df = pd.DataFrame(bacterial_density)
-		dens_file = 'density_field.csv'
-		dens_df.to_csv(dens_file, index = False )
+		#dens_file = 'density_field.csv'
+		#dens_df.to_csv(dens_file, index = False )
 
 		#save updated versions of the density and concentration periodically
-		if self.ticks % 50 == 0: #save every 50 ticks (i.e every 5 seconds)
+		if self.ticks % 100 == 0: #save every 100 ticks (i.e every 5 seconds)
 			concfield_name = str(self.name)+'_concentration_field_'+str(self.ticks) + "_ticks.csv"
 			densfield_name = str(self.name)+'_density_field_' +str(self.ticks) + "_ticks.csv"
 			u_df.to_csv(concfield_name, index = False)
 			dens_df.to_csv(densfield_name, index = False)
 
+		#update band location with the current location of the chemotaxis band
+		#TODO regulate at which timepoints this is updated
+		self.detectBand(dens_df)
+		#save the band density
+		band_name = str(self.name) + '_band_location_'+str(self.ticks)+"_ticks.csv"
+		band_df = pd.DataFrame({'time': [self.dt*i for i in range(0,self.ticks)], "distance (cm)": self.population})
+		band_df.to_csv(band_name, index = False)
+
+	def detectBand(self, dens_df):
+		"""
+		Detect the band in the tube by evaluating the mean bacterial density across each row
+		:return:
+		"""
+		dens_df = dens_df.T
+		col_means = dens_df.values.mean(axis=0)
+
+		#get the column with the maximum density
+		max_dens_dx = np.where(col_means == np.amax(col_means))
+
+		#get the location relative to the size of the tube
+		max_dens_loc = max_dens_dx[0][0] * self.dx
+
+		#update the list of band locations
+		self.band_location.append(max_dens_loc)
+
 	def step(self):
 		self.schedule.step()
-		self.stepConcentration()
+		#self.stepConcentration()
 		self.bacteriaReproduce()
 		#update the number of ticks which have occured
 		self.ticks = self.ticks + 1
 
-def kernel(value, std):
-	"""
-	Calculate the Gaussian kernel given a dataframe and standard deviation
-	:param value:
-	:param std:
-	:return:
-	"""
-	K = (1/(np.sqrt(2*np.pi*std*std)))*np.exp((-value*value)/(2*std*std))
-	return K
 
 
 

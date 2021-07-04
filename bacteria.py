@@ -1,35 +1,31 @@
+"""
+Creates a bacteria object which can be added to a tube model
+"""
 import numpy as np
 import random
 import pandas as pd
-
 from mesa import Agent
 
-# calculate the rotational diffusion coefficient
-# calculated as a sphere representing E. coli
-#K = 1.38E-23  # Boltzman's coefficient
-#T = 298  # temperature in kelvin
-#vis = 0.027  # g/cm viscosity
 radius = 10E-4  # cm
-#f_sphere = 8 * np.pi * vis * radius  # frictional drag coefficient for a sphere
-#D_rot = (K * T) / f_sphere
 D_rot = 0.062 #rational diffusion coefficient radians^2/s
-D_rot = D_rot *10E-9
+D_rot = D_rot*10E-9 #change the units to cm
 epsilon = 10E-10 #adjusts edges of the modelling space
 
-alpha =  2 #bias of the bacteria to the nutrients it is consuming
-doubling_mean = 27000
-doubling_std = 120
-doubling_mean = 360
-doubling_std = 20
+alpha =  0.5  #bias of the bacteria to the nutrients it is consuming based on the previous run duration
+#doubling_mean = 360
+doubling_mean = 10E+26
+doubling_std = 0
+#doubling_std = 20
+
 velocity_mean = 2.41E-3 #mean velocity in cm/s
-#velocity_mean = 24.1  #velocity in microns
-#velocity_std = 6.8E-8
-velocity_std = 0
+velocity_std = 6E-4 #standrd deviation of the velocity
 
 #wall effects
-arch_collision = 0.5 #probability of an arch collision
+arch_collision = 1 #probability of an arch collision
 tangent_collision = 1 - arch_collision #probability of a tangential deflection collision
 
+#list of positions
+pos_list =[]
 
 class Bacteria(Agent):
     """
@@ -44,7 +40,7 @@ class Bacteria(Agent):
         pos,
         width,
         height,
-        doubling,
+        daughter,
     ):
         """
         Create a new Bacteria
@@ -52,8 +48,11 @@ class Bacteria(Agent):
         Args:
             unique_id: Unique agent identifier.
             pos: Starting position
-
+            width: size of the modelling space
+            height: size fo the modelling space
+            daughter: True/False of whether bacteria is a daughter cell of a cell in the model
         """
+
         super().__init__(unique_id, model)
         self.pos = np.array(pos)
         self.ang_mean = 68
@@ -61,27 +60,25 @@ class Bacteria(Agent):
         self.velocity = np.random.normal(velocity_mean, velocity_std, 1)
         self.mean_run = 1
         self.mean_tumble = 0.1
-        self.status = 0 #determines whether running or tumbling. 0 is tumbling, 1 is running
+        self.status = 0 #determines whether running or tumbling. 0 is tumbling, 1 is running, 2 is extending a run
         self.duration = self.getDuration(self.mean_tumble) #stores the time of the duration
         self.dt = 0.01 #time for each tick in the simulation
         self.timer = 0  #traces where up to on the current run/tumble
         self.ang = 0 # angle for running
+        self.step_counter = 0 #count the number of steps the agent has done
 
         #wiener process for rotational diffusion
-        self.x_wiener = self.wienerProcess(20, self.dt)
         self.W_x = np.sqrt(self.dt) * np.random.normal(0, 1, 1)
         self.W_y = np.sqrt(self.dt) * np.random.normal(0, 1, 1)
-
-        self.y_wiener = self.wienerProcess(20, self.dt)
         self.c_start = 0 #concentration of attractant at the start of the run
         self.c_end = 0 #concentration of attractant at the end of the run
 
-        if doubling == False:
-            self.next_double = np.random.uniform(0,doubling_mean, 1) #select the reproduction rate from a uniform distribution
-        else:
-            self.next_double = np.random.normal(doubling_mean, doubling_std, 1)
 
-        self.F = [1,1] #variable which when not zero represents bacteria colliding with wall
+        self.next_double = np.random.normal(doubling_mean, doubling_std, 1)
+
+        if daughter == False:
+            #if the bacteria is new it could be anywhere in its growth cycle
+            self.next_double = np.random.uniform(0, self.next_double,1)
 
         global model_width
         global model_height
@@ -128,44 +125,6 @@ class Bacteria(Agent):
 
         return dur
 
-    #def wienerProcess(self, T, dt):
-    #    """
-    #    Used to simulate Brownian motion
-    #    dt - tick time
-    #    T - number of seconds to generate the Wiener process
-    #    :return:
-    #    """
-
-     #   #number of discrete timesteps
-     #   N = int(T/dt)
-
-     #   random_increments = np.random.normal(0, 1, N)*np.sqrt(dt) #the epsilon values
-     #   wiener_process = np.cumsum(random_increments) #calculate the wiener process
-     #   wiener_process = np.insert(wiener_process, 0, 0) #insert the intial condition
-
-     #   return wiener_process
-
-    def wienerProcess(self, T, dt):
-
-
-        T = 1
-        N = int(T/dt)
-
-        # preallocate arrays for efficency
-        dW = np.zeros((1, N))
-        W = np.zeros((1, N))
-
-        # intialise the first approximation
-        dW[0, 0] = np.sqrt(dt) * np.random.normal(0, 1, 1)
-        W[0, 0] = dW[0, 0]
-
-        # loop
-        for j in range(1, N):
-            dW[0, j] = np.sqrt(dt) * np.random.normal(0, 1, 1)
-            W[0, j] = W[0, j - 1] + dW[0, j]
-
-        return W
-
     def checkCollision(self, pos):
         """
         Check if the bacteria collide with the side of the tube.
@@ -191,12 +150,12 @@ class Bacteria(Agent):
 
             p = random.uniform(0, 1)
 
-            if p < arch_collision:
-                self.status = 0
-                self.timer = 0
-                self.duration = self.getDuration(self.mean_tumble)
+            #if p < arch_collision:
+                #self.status = 0
+                #self.timer = 0
+                #self.duration = self.getDuration(self.mean_tumble)
 
-            else:
+            if p > arch_collision:
             #tangental
                 self.ang = self.ang+90
 
@@ -206,12 +165,12 @@ class Bacteria(Agent):
 
             p = random.uniform(0, 1)
 
-            if p < arch_collision:
-                self.status = 0
-                self.timer = 0
-                self.duration = self.getDuration(self.mean_tumble)
+            #if p < arch_collision:
+                #self.status = 0
+                #self.timer = 0
+                #self.duration = self.getDuration(self.mean_tumble)
 
-            else:
+            if p > arch_collision:
             #tangental
                 self.ang = self.ang+90
 
@@ -221,12 +180,12 @@ class Bacteria(Agent):
 
             p = random.uniform(0, 1)
 
-            if p < arch_collision:
-                self.status = 0
-                self.timer = 0
-                self.duration = self.getDuration(self.mean_tumble)
+            #if p < arch_collision:
+                #self.status = 0
+                #self.timer = 0
+                #self.duration = self.getDuration(self.mean_tumble)
 
-            else:
+            if p > arch_collision:
             #tangental
                 self.ang = self.ang+90
 
@@ -236,12 +195,12 @@ class Bacteria(Agent):
 
             p = random.uniform(0, 1)
 
-            if p < arch_collision:
-                self.status = 0
-                self.timer = 0
-                self.duration = self.getDuration(self.mean_tumble)
+            #if p < arch_collision:
+                #self.status = 0
+                #self.timer = 0
+                #self.duration = self.getDuration(self.mean_tumble)
 
-            else:
+            if p > arch_collision:
             #tangental
                 self.ang = self.ang+90
 
@@ -279,7 +238,7 @@ class Bacteria(Agent):
         """
 
         #get the neighbours of the bacteria
-        vision = 10E-8 #vision is the radius of the bacteria
+        vision = radius #vision is the radius of the bacteria
         colliders = self.model.space.get_neighbors(self.pos, vision, False)
 
         if len(colliders) > 0:
@@ -295,6 +254,10 @@ class Bacteria(Agent):
         """
         Move the bacteria accordingly
         """
+
+        #if bacteria have just doubled reset the doubling timer
+        if self.next_double < self.dt:
+            self.next_double = np.random.normal(doubling_mean, doubling_std, 1)
 
         #check if the bacteria is about to collide
         self.neighbourCollide()
@@ -313,14 +276,18 @@ class Bacteria(Agent):
         #update the time until the next double
         self.next_double = self.next_double - self.dt
 
-        #if bacteria have just doubled reset the doubling timer 
-        if self.next_double < self.dt:
-            self.next_double = np.random.normal(doubling_mean, doubling_std, 1)
-
         #update the wiener processes for rotational diffusion
         self.W_x = self.W_x + np.sqrt(self.dt) * np.random.normal(0,1,1)
         self.W_y = self.W_y + np.sqrt(self.dt) * np.random.normal(0,1,1)
 
+        #save the positions to a file
+        self.step_counter = self.step_counter + 1
+        pos_list.append(self.pos)
+
+        #save only every 10 second
+        if self.step_counter % 1000 == 0:
+            pos_df = pd.DataFrame({'position': pos_list})
+            pos_df .to_csv('example_position_list4.csv', index = False)
 
         #hdebugging lines which can be uncommented
         #print('run duration: '+str(self.duration))
@@ -340,10 +307,6 @@ class Bacteria(Agent):
                 self.ang = (self.getAngle(self.ang_mean, self.ang_std) + self.ang) % 360
                 #get the duration of the next run
                 self.duration = self.getDuration(self.mean_run)
-                #get the wiener processes for the next run
-                #generate for 10 seconds in case the run is extended
-                self.x_wiener = self.wienerProcess(10, self.dt)
-                self.y_wiener = self.wienerProcess(10, self.dt)
                 self.velocity = np.random.normal(velocity_mean, velocity_std, 1)
 
             #if its not tumbling its either extending or running
@@ -357,7 +320,7 @@ class Bacteria(Agent):
                     self.c_end = current_conc
 
                     if self.c_end > self.c_start:
-                        self.duration = alpha * self.getDuration(self.mean_run)
+                        self.duration = alpha * self.duration
                         self.status = 2
 
                 else:

@@ -1,6 +1,6 @@
 """
 Run the simulation using this script.
-The population size and width and height of the modelling space can be set using the command line.
+The population size, width and height of the modelling space can be set using the command line.
 """
 from model import Tube
 import argparse
@@ -16,4 +16,8 @@ args = parser.parse_args()
 model = Tube(args.population, args.width, args.height, args.name)
 for i in range(args.steps):
     model.step()
-    print('step: '+str(i))
+    print('step: '+str(i+1))
+
+#print a summary
+print('COMPLETE')
+print('Starting number of bacteria: '+str(args.population))
