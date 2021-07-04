@@ -48,8 +48,8 @@ class Tube(Model):
 		self.width = width
 		self.height = height
 		self.name = name
-		self.dx = 0.0001 #size of grid increments
-		self.dt = 0.1 #length of the timesteps in the model
+		self.dx = 0.01 #size of grid increments
+		self.dt = 0.01 #length of the timesteps in the model
 		self.nx = int(width/self.dx) #number of increments in x direction
 		self.ny = int(height/self.dx) #number of increments in y direction
 		self.ticks = 0 #count the number of ticks which have elapsed
