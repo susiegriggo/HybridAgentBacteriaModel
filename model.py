@@ -50,7 +50,6 @@ class Tube(Model):
 		self.name = name
 		self.dx = 0.01 #size of grid increments
 		self.dt = 0.01 #length of the timesteps in the model
-		self.dt = 0.01 #size of time increments
 		self.nx = int(width/self.dx) #number of increments in x direction
 		self.ny = int(height/self.dx) #number of increments in y direction
 		self.ticks = 0 #count the number of ticks which have elapsed
@@ -194,19 +193,19 @@ class Tube(Model):
 		#dens_df.to_csv(dens_file, index = False )
 
 		#save updated versions of the density and concentration periodically
-		if self.ticks % 100 == 0: #save every 100 ticks (i.e every 5 seconds)
+		if self.ticks % 100 == 0: #save every 100 ticks (i.e every 1 seconds)
 			concfield_name = str(self.name)+'_concentration_field_'+str(self.ticks) + "_ticks.csv"
 			densfield_name = str(self.name)+'_density_field_' +str(self.ticks) + "_ticks.csv"
 			u_df.to_csv(concfield_name, index = False)
 			dens_df.to_csv(densfield_name, index = False)
 
 		#update band location with the current location of the chemotaxis band
-		#TODO regulate at which timepoints this is updated
 		self.detectBand(dens_df)
 		#save the band density
-		band_name = str(self.name) + '_band_location_'+str(self.ticks)+"_ticks.csv"
-		band_df = pd.DataFrame({'time': [self.dt*i for i in range(0,self.ticks)], "distance (cm)": self.population})
-		band_df.to_csv(band_name, index = False)
+		if self.ticks % 100 == 0: #save every 100 ticks (i.e every 1 second)  
+			band_name = str(self.name) + '_band_location_'+str(self.ticks)+"_ticks.csv"
+			band_df = pd.DataFrame({'time': [self.dt*i for i in range(0,self.ticks)], "distance (cm)": self.band_location})
+			band_df.to_csv(band_name, index = False)
 
 	def detectBand(self, dens_df):
 		"""
@@ -227,7 +226,7 @@ class Tube(Model):
 
 	def step(self):
 		self.schedule.step()
-		#self.stepConcentration()
+		self.stepConcentration()
 		self.bacteriaReproduce()
 		#update the number of ticks which have occured
 		self.ticks = self.ticks + 1
