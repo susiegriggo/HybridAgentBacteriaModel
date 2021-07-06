@@ -27,9 +27,6 @@ tau = 1 #time scale
 L = 1 #lengh scaling
 p_inf = 1 #population scaling
 
-doubling_mean = 360 #mean doubling time of bacteria
-doubling_std = 20 #std of doubling time of bacteria
-
 
 class Tube(Model):
 	"""
@@ -48,13 +45,13 @@ class Tube(Model):
 		self.width = width
 		self.height = height
 		self.name = name
-		self.dx = 0.01 #size of grid increments
+		self.dx = 0.0001 #size of grid increments
 		self.dt = 0.01 #length of the timesteps in the model
 		self.nx = int(width/self.dx) #number of increments in x direction
 		self.ny = int(height/self.dx) #number of increments in y direction
-		self.ticks = 0 #count the number of ticks which have elapsed
+		self.ticks = 1 #count the number of ticks which have elapsed
 		self.schedule = RandomActivation(self)
-		self.space = ContinuousSpace(width, height, True)
+		self.space = ContinuousSpace(width, height, False)
 		self.make_agents()
 		self.running = True 
 
@@ -67,7 +64,7 @@ class Tube(Model):
 		#generate grid to solve the concentration over 
 		self.u0 = self.c_star * np.ones((self.nx+1, self.ny+1)) #starting concentration of bacteria
 		self.u = self.u0.copy() #current concentration of bacteria - updating through each timestep
-		self.dens = None #placeholder for the density kernel
+
 
 		#store the location of the band at each timepoint
 		self.band_location = []  # intialise list to store the location of the band at each dt
@@ -84,7 +81,6 @@ class Tube(Model):
 			y = self.height/2
 
 			pos = np.array((0.00035, y))
-			pos = np.array((0.5, 0.5))
 
 			bacteria = Bacteria(
 				i,
@@ -93,6 +89,8 @@ class Tube(Model):
 				self.width,
 				self.height,
 				False,
+				self.name,
+				"tumble"
 			)
 			self.space.place_agent(bacteria, pos)
 			self.schedule.add(bacteria)
@@ -127,12 +125,11 @@ class Tube(Model):
 					self.width,
 					self.height,
 					True,
+					self.name,
+					"tumble"
 				)
 				self.space.place_agent(bacteria, pos)
 				self.schedule.add(bacteria)
-
-				#reset the growth status of the bacteria which just doubled
-				#all_agents[i].next_double = np.random.normal(doubling_mean, doubling_std, 1)
 
 	def densityKernel(self):
 		"""
@@ -174,10 +171,10 @@ class Tube(Model):
 		dx2, dy2 = self.dx * self.dx, self.dx * self.dx
 
 		#get the gaussian density kernel of the bacteria
-		self.dens = self.densityKernel().T
+		bacterial_density = self.densityKernel().T
 
 		self.u[1:-1, 1:-1] = self.u0[1:-1, 1:-1] + self.D_star * self.dt * ((self.u0[2:, 1:-1] - 2 * self.u0[1:-1, 1:-1] + self.u0[:-2, 1:-1]) / dx2 + (
-						self.u0[1:-1, 2:] - 2 * self.u0[1:-1, 1:-1] + self.u0[1:-1, :-2]) / dy2) - self.dt * self.beta_star *self.population*self.dens[1:-1, 1:-1]
+						self.u0[1:-1, 2:] - 2 * self.u0[1:-1, 1:-1] + self.u0[1:-1, :-2]) / dy2) - self.dt * self.beta_star *self.population*bacterial_density[1:-1, 1:-1]
 
 		# set such that the concentration cannot be lowered below zero
 		self.u[self.u < 0] = 0
@@ -186,15 +183,13 @@ class Tube(Model):
 
 		#have the concentration save to a file such that it can be read by the agents
 		u_df = pd.DataFrame(self.u)
-		#conc_file = 'concentration_field.csv'
-		#u_df.to_csv(conc_file, index = False)
+		conc_file = str(self.name)+'_concentration_field.csv'
+		u_df.to_csv(conc_file, index = False)
 
-		dens_df = pd.DataFrame(self.dens)
-		#dens_file = 'density_field.csv'
-		#dens_df.to_csv(dens_file, index = False )
+		dens_df = pd.DataFrame(bacterial_density)
 
 		#save updated versions of the density and concentration periodically
-		if self.ticks % 100 == 0: #save every 100 ticks (i.e every 1 seconds)
+		if self.ticks % 10 == 0: #save every 100 ticks (i.e every 10 seconds)
 			concfield_name = str(self.name)+'_concentration_field_'+str(self.ticks) + "_ticks.csv"
 			densfield_name = str(self.name)+'_density_field_' +str(self.ticks) + "_ticks.csv"
 			u_df.to_csv(concfield_name, index = False)
@@ -203,10 +198,10 @@ class Tube(Model):
 		#update band location with the current location of the chemotaxis band
 		self.detectBand(dens_df)
 		#save the band density
-		if self.ticks % 100 == 0: #save every 100 ticks (i.e every 1 second)  
-			band_name = str(self.name) + '_band_location_'+str(self.ticks)+"_ticks.csv"
-			band_df = pd.DataFrame({'time': [self.dt*i for i in range(0,self.ticks)], "distance (cm)": self.band_location})
-			band_df.to_csv(band_name, index = False)
+		#if self.ticks % 100 == 0: #save every 100 ticks (i.e every 1 second)
+		#	band_name = str(self.name) + '_band_location_'+str(self.ticks)+"_ticks.csv"
+		#	band_df = pd.DataFrame({'time': [self.dt*i for i in range(0,self.ticks)], "distance (cm)": self.band_location})
+		#	band_df.to_csv(band_name, index = False)
 
 	def detectBand(self, dens_df):
 		"""
@@ -231,9 +226,7 @@ class Tube(Model):
 		self.bacteriaReproduce()
 		#update the number of ticks which have occured
 		self.ticks = self.ticks + 1
-
-def compute_density(model):
-	return model.dens
+		print('TIME ELAPSED: '+ str(self.ticks*self.dt)+ ' seconds', flush = True)
 
 def compute_concentration(model):
 	return model.u
