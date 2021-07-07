@@ -80,9 +80,9 @@ class Tube(Model):
 			x = 0
 			y = self.height/2
 
-
-			pos = np.array((0.00035, y))
-			pos = np.array((0.05,0.005))
+			x = self.width/2
+			pos = np.array((0.0035, y))
+			
 
 			bacteria = Bacteria(
 				i,
@@ -223,11 +223,11 @@ class Tube(Model):
 
 	def step(self):
 		self.schedule.step()
-		self.stepConcentration()
+		#self.stepConcentration()
 		#self.bacteriaReproduce()
 		#update the number of ticks which have occured
 		self.ticks = self.ticks + 1
-		if self.ticks % 500: 
+		if self.ticks % 10 == 0: 
 			print('TIME ELAPSED: '+ str(self.ticks*self.dt)+ ' seconds', flush = True)
 
 def compute_concentration(model):
