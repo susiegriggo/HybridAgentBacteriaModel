@@ -45,7 +45,7 @@ class Tube(Model):
 		self.width = width
 		self.height = height
 		self.name = name
-		self.dx = 0.0001 #size of grid increments
+		self.dx = 0.001 #size of grid increments
 		self.dt = 0.01 #length of the timesteps in the model
 		self.nx = int(width/self.dx) #number of increments in x direction
 		self.ny = int(height/self.dx) #number of increments in y direction
@@ -59,7 +59,7 @@ class Tube(Model):
 		self.D_star = (D_c*tau)/(L*L)
 		self.c_star = 1
 		self.beta_star = (beta*p_inf*tau)/(c_0*self.width*self.height)
-		#self.beta_star = 1E-8#practise placeholder parameter
+		self.beta_star = 1E-8 #practise placeholder parameter
 
 		#generate grid to solve the concentration over 
 		self.u0 = self.c_star * np.ones((self.nx+1, self.ny+1)) #starting concentration of bacteria
@@ -80,7 +80,9 @@ class Tube(Model):
 			x = 0
 			y = self.height/2
 
+
 			pos = np.array((0.00035, y))
+			pos = np.array((0.05,0.005))
 
 			bacteria = Bacteria(
 				i,
@@ -223,7 +225,7 @@ class Tube(Model):
 	def step(self):
 		self.schedule.step()
 		self.stepConcentration()
-		self.bacteriaReproduce()
+		#self.bacteriaReproduce()
 		#update the number of ticks which have occured
 		self.ticks = self.ticks + 1
 		print('TIME ELAPSED: '+ str(self.ticks*self.dt)+ ' seconds', flush = True)

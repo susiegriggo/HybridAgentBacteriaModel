@@ -20,6 +20,7 @@ doubling_std = 0
 
 velocity_mean = 2.41E-3 #mean velocity in cm/s
 velocity_std = 6E-4 #standrd deviation of the velocity
+reverse_std = 20
 
 #wall effects
 arch_collision = 0 #probability of an arch collision
@@ -62,17 +63,31 @@ class Bacteria(Agent):
         self.pos = np.array(pos)
         self.model_name = model_name #name of the model which the agent resides
         self.pattern = pattern
-
-        self.ang_mean = 68
-        self.ang_std = 37
-        self.velocity = np.random.normal(velocity_mean, velocity_std, 1)
         self.mean_run = 1
-        self.mean_tumble = 0.1
-        self.status = 0 #determines whether running or tumbling. 0 is tumbling, 1 is running, 2 is extending a run
-        self.duration = self.getDuration(self.mean_tumble) #stores the time of the duration
+
+
+        if self.pattern == "tumble":
+            self.ang_mean = 68
+            self.ang_std = 37
+            self.status = 0  # 0 is tumbling, 1 is running, 2 is extending a run
+            self.mean_tumble = 0.1
+            self.duration = self.getDuration(self.mean_tumble)
+
+        if self.pattern == "reverse":
+            self.reverse_std = 20
+            self.status = 1 #1 is running, 2 is extending a run
+            self.duration = self.getDuration(self.mean_run)
+
+        if self.pattern == "flick":
+            self.status = 1 #1 is running, 2 is extending a run, 3 is flicking
+            self.flick_std = 45
+            self.reverse_std = 20
+            self.duration = self.getDuration(self.mean_run)
+
+        self.ang = np.random.uniform(0, 360, 1)  # an intial angle such that all of the angles are not synced up
+        self.velocity = np.random.normal(velocity_mean, velocity_std, 1)
         self.dt = 0.01 #time for each tick in the simulation
         self.timer = 0  #traces where up to on the current run/tumble
-        self.ang = 0 # angle for running
         self.step_counter = 0 #count the number of steps the agent has done
 
         #wiener process for rotational diffusion
@@ -92,7 +107,7 @@ class Bacteria(Agent):
         model_width = width
         model_height = height
 
-    def getAngle(self, ang_mean, ang_std):
+    def getTumbleAngle(self, ang_mean, ang_std):
         """
         get the angle for the next reorientation from Bergs lognormal distribution
         with mean of 68 degrees with a standard deviation of 37 degrees
@@ -241,12 +256,12 @@ class Bacteria(Agent):
         if len(colliders) > 0:
 
             #generate a new run angle
-            self.ang = self.getAngle(self.ang_mean, self.ang_std) + self.ang
+            self.ang = self.getTumbleAngle(self.ang_mean, self.ang_std) + self.ang
             self.ang = self.ang % 360
 
             #give the colliders new angles as well
             for collider in colliders:
-                collider.ang = (self.getAngle(self.ang_mean, self.ang_std) +self.ang)
+                collider.ang = (self.getTumbleAngle(self.ang_mean, self.ang_std) +self.ang)
                 collider.ang = collider.ang %360
 
     def tumbleStep(self):
@@ -260,7 +275,7 @@ class Bacteria(Agent):
             if self.status == 0:
                 self.status = 1
                 # generate a new running angle
-                self.ang = self.getAngle(self.ang_mean, self.ang_std) + self.ang
+                self.ang = self.getTumbleAngle(self.ang_mean, self.ang_std) + self.ang
                 self.ang = self.ang %360
                 # get the duration of the next run
                 self.duration = self.getDuration(self.mean_run)
@@ -280,7 +295,7 @@ class Bacteria(Agent):
                         self.duration = alpha * self.duration
                         #self.duration = alpha * self.getDuration(self.mean_run)
                         self.status = 2
-        
+
                 else:
 
                     # if biasing already it is time to tumble
@@ -291,16 +306,96 @@ class Bacteria(Agent):
             # reset timer
             self.timer = 0
 
-   # def reverseStep(self):
+    def reverseStep(self):
         """
-        Adjust timers for a run and reverse motility pattern
+        Adjust timers for a run and reverse motility pattern.
+        1 - running
+        2 - extending the run
         :return:
         """
-    #    if self.timer >= self.duration:
 
-            #if currently running change to reverse
+        if self.timer >= self.duration:
+
+            #if the run has already been extended then reverse
+            if self.status == 2:
+
+                self.reverseRun()
+
+            #chec if the run should be extened
+            elif self.status == 1 :
+
+                # if not biasing movement already see if it can be extended
+                # current_conc = self.pos[0]
+                current_conc = self.getConcentration()
+                self.c_start = self.c_end
+                self.c_end = current_conc
+
+                #if it is increasing then continue
+                if self.c_end > self.c_start:
+                    self.duration = alpha * self.duration
+                    # self.duration = alpha * self.getDuration(self.mean_run)
+                    self.status = 2
+
+                #if it is not increasing then reverse
+                else:
+                    self.reverseRun()
+
+    def reverseFlickStep(self):
+        """
+        Adjust timer for a run and reverse motility pattern
+        `1 - flicking
+         2 - reversing
+         3 - extending the reverse
+        """
+
+        if self.timer >= self.duration:
+
+            if self.status == 3:
+
+                #if already extending it is time to flick
+                self.ang = np.random.normal(90, self.reverse_std)
+                self.duration = self.getDuration(self.mean_run)
+                self.status = 1
+
+            elif self.status == 1:
+                #if currently flicking then change to a reverse
+                self.ang = np.random.normal(180, self.reverse_std)
+                self.duration = self.getDuration(self.mean_run)
+                self.status = 2
+
+            elif self.status == 2:
+                #if currently reversing then see if reverse should be extended
+                # current_conc = self.pos[0]
+                current_conc = self.getConcentration()
+                self.c_start = self.c_end
+                self.c_end = current_conc
+
+                # if it is increasing then extend the run
+                if self.c_end > self.c_start:
+                    self.duration = alpha * self.duration
+                    # self.duration = alpha * self.getDuration(self.mean_run)
+                    self.status = 3
+
+                #if not then flick
+                else:
+                    self.ang = np.random.normal(90, self.reverse_std)
+                    self.duration = self.getDuration(self.mean_run)
+                    self.status = 1
 
 
+    def reverseRun(self):
+        """Generates a reverse run for the run and reverse motility pattern"""
+
+        # get a new angle
+        reverse_ang = np.random.normal(180, self.reverse_std, 1)
+        reverse_direction = random.randint(0, 1)
+        self.ang = (self.ang + reverse_ang * reverse_direction) % 360
+
+        # get a duration for the new run
+        self.duration = self.getDuration(self.mean_run)
+
+        # get the velocity of the new run
+        self.velocity = np.random.normal(velocity_mean, velocity_std, 1)
 
     def step(self):
         """
@@ -312,12 +407,12 @@ class Bacteria(Agent):
             self.next_double = np.random.normal(doubling_mean, doubling_std, 1)
 
         #check if the bacteria is about to collide
-        self.neighbourCollide()
+        #self.neighbourCollide()
 
         #get the current timestep in the run/tumble
         step_num = int(self.timer/self.dt)
-        x_new = self.pos[0] + self.velocity*self.status*np.cos(np.deg2rad(self.ang))*self.dt+np.sqrt(2*D_rot*self.dt)*self.W_x
-        y_new = self.pos[1] + self.velocity*self.status*np.sin(np.deg2rad(self.ang))*self.dt+np.sqrt(2*D_rot*self.dt)*self.W_y
+        x_new = self.pos[0] + self.velocity*self.status*np.cos(np.deg2rad(self.ang))*self.dt#+np.sqrt(2*D_rot*self.dt)*self.W_x
+        y_new = self.pos[1] + self.velocity*self.status*np.sin(np.deg2rad(self.ang))*self.dt#+np.sqrt(2*D_rot*self.dt)*self.W_y
         new_pos = [x_new[0], y_new[0]]
 
         #check if bacterium collide with edges of the modelling space
@@ -339,17 +434,22 @@ class Bacteria(Agent):
         #perform adjusts necessary for the current motility pattern
         if self.pattern == 'tumble':
             self.tumbleStep()
+        if self.pattern == 'reverse':
+            self.reverseStep()
+        if self.pattern == 'flick':
+            self.reverseFlickStep()
 
-    """
 	#uncomment only to make the figure of the run and tumble motlity pattern 
 	#save the positions to a file
-        self.step_counter = self.step_counter + 1
-        pos_list.append(self.pos)
+"""
+        if self.unique_id == 1:
+            self.step_counter = self.step_counter + 1
+            pos_list.append(self.pos)
 
-        #save only every 10 second
-        if self.step_counter % 1000 == 0:
-            pos_df = pd.DataFrame({'position': pos_list})
-            pos_df .to_csv('example_position_list14.csv', index = False)
+            #save only every 10 second
+            if self.step_counter % 1000 == 0:
+                pos_df = pd.DataFrame({'position': pos_list})
+                pos_df .to_csv('example_position_list15.csv', index = False)
 
         """
 
@@ -360,6 +460,9 @@ class Bacteria(Agent):
         #print('angle: '+str(self.ang))
         #print('velocity: '+str(self.velocity))
         #print('')
+        
+"""
+"""
 
 
 
