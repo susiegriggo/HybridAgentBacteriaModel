@@ -12,18 +12,17 @@ D_rot = 0.062 #rational diffusion coefficient radians^2/s
 D_rot = D_rot*10E-9 #change the units to cm
 epsilon = 10E-16#adjusts edges of the modelling space- must be sufficiently small or causes errors with wall effects
 
-alpha =  1  #bias of the bacteria to the nutrients it is consuming based on the previous run duration
+alpha =  0.5  #bias of the bacteria to the nutrients it is consuming based on the previous run duration
 doubling_mean = 360
 doubling_std = 20
-doubling_mean = 10E+26
-doubling_std = 0
+#doubling_mean = 10E+26
+#doubling_std = 0
 
 velocity_mean = 2.41E-3 #mean velocity in cm/s
 velocity_std = 6E-4 #standrd deviation of the velocity
-reverse_std = 20
 
 #wall effects
-arch_collision = 0 #probability of an arch collision
+arch_collision = 1 #probability of an arch collision
 tangent_collision = 1 - arch_collision #probability of a tangential deflection collision
 
 #list of positions
@@ -365,7 +364,7 @@ class Bacteria(Agent):
 
             elif self.status == 2:
                 #if currently reversing then see if reverse should be extended
-                # current_conc = self.pos[0]
+                current_conc = self.pos[0]
                 current_conc = self.getConcentration()
                 self.c_start = self.c_end
                 self.c_end = current_conc

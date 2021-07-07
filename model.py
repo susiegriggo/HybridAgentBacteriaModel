@@ -82,7 +82,6 @@ class Tube(Model):
 
 
 			pos = np.array((0.00035, y))
-			pos = np.array((0.05,0.005))
 
 			bacteria = Bacteria(
 				i,
