@@ -45,7 +45,7 @@ class Tube(Model):
 		self.width = width
 		self.height = height
 		self.name = name
-		self.dx = 0.0001 #size of grid increments
+		self.dx = 0.001 #size of grid increments
 		self.dt = 0.01 #length of the timesteps in the model
 		self.nx = int(width/self.dx) #number of increments in x direction
 		self.ny = int(height/self.dx) #number of increments in y direction
@@ -80,7 +80,9 @@ class Tube(Model):
 			x = 0
 			y = self.height/2
 
+
 			pos = np.array((0.00035, y))
+			pos = np.array((0.05,0.005))
 
 			bacteria = Bacteria(
 				i,
@@ -222,7 +224,7 @@ class Tube(Model):
 	def step(self):
 		self.schedule.step()
 		self.stepConcentration()
-		self.bacteriaReproduce()
+		#self.bacteriaReproduce()
 		#update the number of ticks which have occured
 		self.ticks = self.ticks + 1
 		if self.ticks % 500: 
