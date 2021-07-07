@@ -59,7 +59,7 @@ class Tube(Model):
 		self.D_star = (D_c*tau)/(L*L)
 		self.c_star = 1
 		self.beta_star = (beta*p_inf*tau)/(c_0*self.width*self.height)
-		self.beta_star = 1E-8 #practise placeholder parameter
+		self.beta_star = 1E-8#practise placeholder parameter
 
 		#generate grid to solve the concentration over 
 		self.u0 = self.c_star * np.ones((self.nx+1, self.ny+1)) #starting concentration of bacteria
@@ -78,10 +78,11 @@ class Tube(Model):
 
 			#have the initial position start at the centre of the y axis
 			x = 0
+            #x = self.width/2 #uncomment to position bacteria in the centre of the modelling space 
 			y = self.height/2
 
-
-			pos = np.array((0.00035, y))
+			#x = self.width/2
+			pos = np.array((x, y))
 
 			bacteria = Bacteria(
 				i,
@@ -135,7 +136,6 @@ class Tube(Model):
 	def densityKernel(self):
 		"""
 		Use the Multivariate Gaussian density kernel to calculate the density of bacteria in the tube
-
 		Uses a multivariate kernel estimate. Estimates the bandwidth using Scotts rule.
 		"""
 
@@ -190,7 +190,7 @@ class Tube(Model):
 		dens_df = pd.DataFrame(bacterial_density)
 
 		#save updated versions of the density and concentration periodically
-		if self.ticks % 10 == 0: #save every 100 ticks (i.e every 10 seconds)
+		if self.ticks % 100 == 0: #save every 100 ticks (i.e every 10 seconds)
 			concfield_name = str(self.name)+'_concentration_field_'+str(self.ticks) + "_ticks.csv"
 			densfield_name = str(self.name)+'_density_field_' +str(self.ticks) + "_ticks.csv"
 			u_df.to_csv(concfield_name, index = False)
@@ -223,11 +223,12 @@ class Tube(Model):
 
 	def step(self):
 		self.schedule.step()
-		self.stepConcentration()
+		#self.stepConcentration()
 		#self.bacteriaReproduce()
 		#update the number of ticks which have occured
 		self.ticks = self.ticks + 1
-		print('TIME ELAPSED: '+ str(self.ticks*self.dt)+ ' seconds', flush = True)
+		if self.ticks % 10 == 0: 
+			print('TIME ELAPSED: '+ str(self.ticks*self.dt)+ ' seconds', flush = True)
 
 def compute_concentration(model):
 	return model.u
