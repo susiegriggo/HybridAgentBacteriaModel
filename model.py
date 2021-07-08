@@ -20,12 +20,11 @@ from bacteria import Bacteria
 D_c = 1.e-10 #diffusion coefficient of the nutrients
 c_0= 5.56E-3 #intial concentration of glucose in the tube
 beta = 5E-18 #number of moles of glucose consumed per bacteria per second
-radius = 10E-4	#radius of bacteria in centimetres
+radius = 2*10E-4	#radius of bacteria in centimetres
 
 #scaling parameters
 tau = 1 #time scale
 L = 1 #lengh scaling
-p_inf = 1 #population scaling
 
 
 class Tube(Model):
@@ -56,10 +55,11 @@ class Tube(Model):
 		self.running = True 
 
 		#calculate the values for dimensionless parameters
+		self.p_inf = self.population/(self.width*self.height) #starting density of bacteria
 		self.D_star = (D_c*tau)/(L*L)
 		self.c_star = 1
-		self.beta_star = (beta*p_inf*tau)/(c_0*self.width*self.height)
-		self.beta_star = 1E-8#practise placeholder parameter
+		self.beta_star = (beta*self.p_inf*tau)/(c_0*self.width*self.height)
+		#self.beta_star = 1E-8#practise placeholder parameter
 
 		#generate grid to solve the concentration over 
 		self.u0 = self.c_star * np.ones((self.nx+1, self.ny+1)) #starting concentration of bacteria
@@ -223,8 +223,8 @@ class Tube(Model):
 
 	def step(self):
 		self.schedule.step()
-		#self.stepConcentration()
-		#self.bacteriaReproduce()
+		self.stepConcentration()
+		self.bacteriaReproduce()
 		#update the number of ticks which have occured
 		self.ticks = self.ticks + 1
 		if self.ticks % 10 == 0: 
