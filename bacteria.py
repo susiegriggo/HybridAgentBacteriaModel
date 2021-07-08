@@ -7,7 +7,7 @@ import pandas as pd
 from mesa import Agent
 import math
 
-radius = 10E-4  # cm
+radius = 2*10E-4  # cm
 D_rot = 0.062 #rational diffusion coefficient radians^2/s
 D_rot = D_rot*10E-9 #change the units to cm
 epsilon = 10E-16#adjusts edges of the modelling space- must be sufficiently small or causes errors with wall effects
@@ -20,36 +20,27 @@ doubling_std = 20
 
 velocity_mean = 2.41E-3 #mean velocity in cm/s
 velocity_std = 6E-4 #standrd deviation of the velocity
+mean_run = 1 #mean duration of a run
 
 #wall effects
 arch_collision = 1 #probability of an arch collision
 tangent_collision = 1 - arch_collision #probability of a tangential deflection collision
 
-#list of positions
+#list of positions used to create figures of motility patterns
 pos_list =[]
 
 class Bacteria(Agent):
     """
-
     Creates a bacteria agent
     """
 
-    def __init__(
-        self,
-        unique_id,
-        model,
-        pos,
-        width,
-        height,
-        daughter,
-        model_name,
-        pattern,
-    ):
+    def __init__(self, unique_id, model, pos, width, height, daughter, model_name, pattern):
         """
         Create a new Bacteria
 
         Args:
             unique_id: Unique agent identifier.
+            model: which model the agent is placed in
             pos: Starting position
             width: size of the modelling space
             height: size fo the modelling space
@@ -60,28 +51,27 @@ class Bacteria(Agent):
         super().__init__(unique_id, model)
         self.unique_id = unique_id
         self.pos = np.array(pos)
-        self.model_name = model_name #name of the model which the agent resides
+        self.model_name = model_name
         self.pattern = pattern
-        self.mean_run = 1
 
 
         if self.pattern == "tumble":
-            self.ang_mean = 68
-            self.ang_std = 37
+            self.ang_mean = 68 #mean angle
+            self.ang_std = 37 #standrd deviation of angle
             self.status = 0  # 0 is tumbling, 1 is running, 2 is extending a run
-            self.mean_tumble = 0.1
-            self.duration = self.getDuration(self.mean_tumble)
+            self.mean_tumble = 0.1 #duration of a tumble event
+            self.duration = self.getDuration(self.mean_tumble) #duration of the first run
 
         if self.pattern == "reverse":
-            self.reverse_std = 20
+            self.reverse_std = 20 #standard deviation of angle
             self.status = 1 #1 is running, 2 is extending a run
-            self.duration = self.getDuration(self.mean_run)
+            self.duration = self.getDuration(mean_run) #duration of the first run
 
         if self.pattern == "flick":
             self.status = 1 #1 is running, 2 is extending a run, 3 is flicking
-            self.flick_std = 10
-            self.reverse_std = 2
-            self.duration = self.getDuration(self.mean_run)
+            self.flick_std = 10 #standrd deviation of a flick
+            self.reverse_std = 2 #standrd deviation of a reverse
+            self.duration = self.getDuration(mean_run) #duration of the first run
 
         self.ang = np.random.uniform(0, 360, 1)  # an intial angle such that all of the angles are not synced up
         self.velocity = np.random.normal(velocity_mean, velocity_std, 1)
@@ -92,11 +82,13 @@ class Bacteria(Agent):
         #wiener process for rotational diffusion
         self.W_x = np.sqrt(self.dt) * np.random.normal(0, 1, 1)
         self.W_y = np.sqrt(self.dt) * np.random.normal(0, 1, 1)
-        self.c_start = 0 #concentration of attractant at the start of the run
-        self.c_end = 0 #concentration of attractant at the end of the run
 
+        #concentration of attractant at the start/end of each run
+        self.c_start = 0
+        self.c_end = 0
+
+        #control when the bacteria will reproduce
         self.next_double = np.random.normal(doubling_mean, doubling_std, 1)
-
         if daughter == False:
             #if the bacteria is new it could be anywhere in its growth cycle
             self.next_double = np.random.uniform(0, self.next_double,1)
@@ -108,7 +100,7 @@ class Bacteria(Agent):
 
     def getTumbleAngle(self, ang_mean, ang_std):
         """
-        get the angle for the next reorientation from Bergs lognormal distribution
+        Get the angle for the next reorientation from Bergs lognormal distribution
         with mean of 68 degrees with a standard deviation of 37 degrees
 
         The angle selected may in the positive or negative direction
@@ -243,7 +235,8 @@ class Bacteria(Agent):
 
     def neighbourCollide(self):
         """
-        Get the neighbours which are in the vicinity of the bacteria and see if they collide
+        Get the neighbours which are in the vicinity of the bacteria and see if they collide.
+        Modelled as an inelastic collision. Bacteria pause until a new angle is selected.
         :return:
         """
 
@@ -255,13 +248,14 @@ class Bacteria(Agent):
         if len(colliders) > 0:
 
             #generate a new run angle
-            self.ang = self.getTumbleAngle(self.ang_mean, self.ang_std) + self.ang
-            self.ang = self.ang % 360
+            #self.ang = self.getTumbleAngle(self.ang_mean, self.ang_std) + self.ang
+            #self.ang = self.ang % 360
 
-            #give the colliders new angles as well
             for collider in colliders:
-                collider.ang = (self.getTumbleAngle(self.ang_mean, self.ang_std) +self.ang)
-                collider.ang = collider.ang %360
+
+                collider.velocity = 0
+                #collider.ang = (self.getTumbleAngle(self.ang_mean, self.ang_std) +self.ang)
+                #collider.ang = collider.ang %360
 
     def tumbleStep(self):
         """
@@ -277,7 +271,7 @@ class Bacteria(Agent):
                 self.ang = self.getTumbleAngle(self.ang_mean, self.ang_std) + self.ang
                 self.ang = self.ang %360
                 # get the duration of the next run
-                self.duration = self.getDuration(self.mean_run)
+                self.duration = self.getDuration(mean_run)
                 self.velocity = np.random.normal(velocity_mean, velocity_std, 1)
 
             # if its not tumbling its either extending or running
@@ -292,7 +286,7 @@ class Bacteria(Agent):
 
                     if self.c_end > self.c_start:
                         self.duration = alpha * self.duration
-                        #self.duration = alpha * self.getDuration(self.mean_run)
+                        #self.duration = alpha * self.getDuration(mean_run)
                         self.status = 2
 
                 else:
@@ -335,7 +329,7 @@ class Bacteria(Agent):
                 #if it is increasing then continue
                 if self.c_end > self.c_start:
                     self.duration = alpha * self.duration
-                    # self.duration = alpha * self.getDuration(self.mean_run)
+                    # self.duration = alpha * self.getDuration(mean_run)
                     self.status = 2
 			
 
@@ -378,7 +372,7 @@ class Bacteria(Agent):
                 # if it is increasing then extend the run
                 if self.c_end > self.c_start:
                     self.duration = alpha * self.duration 
-                    # self.duration = alpha * self.getDuration(self.mean_run)
+                    # self.duration = alpha * self.getDuration(mean_run)
                     self.status = 3               
 		     
 
@@ -398,7 +392,7 @@ class Bacteria(Agent):
         self.ang = (self.ang + reverse_ang * reverse_direction) % 360
 
         # get a duration for the new run
-        self.duration = self.getDuration(self.mean_run)
+        self.duration = self.getDuration(mean_run)
 
         # get the velocity of the new run
         self.velocity = np.random.normal(velocity_mean, velocity_std, 1)
@@ -412,7 +406,7 @@ class Bacteria(Agent):
         self.ang = (self.ang + flick_ang * flick_direction) % 360 
         
         #get a duration for the flick 
-        self.duration = self.getDuration(self.mean_run)
+        self.duration = self.getDuration(mean_run)
         
         #get the velocity of the new run 
         self.velocity = np.random.normal(velocity_mean, velocity_std, 1)
