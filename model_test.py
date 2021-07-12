@@ -14,18 +14,18 @@ from mesa import Model
 from mesa.space import ContinuousSpace
 from mesa.time import RandomActivation
 
-from bacteria import Bacteria
+from bacteria_test import Bacteria
+from collections import Counter
 
 #set global variables for the tube model
 D_c = 1.e-10 #diffusion coefficient of the nutrients
 c_0= 5.56E-3 #intial concentration of glucose in the tube
 beta = 5E-18 #number of moles of glucose consumed per bacteria per second
-radius = 2*10E-4	#radius of bacteria in centimetres
+radius = 1*10E-4	#radius of bacteria in centimetres
 
 #scaling parameters
 tau = 1 #time scale
 L = 1 #lengh scaling
-
 
 class Tube(Model):
 	"""
@@ -52,19 +52,18 @@ class Tube(Model):
 		self.schedule = RandomActivation(self)
 		self.space = ContinuousSpace(width, height, False)
 		self.make_agents()
-		self.running = True 
+		self.running = True
 
 		#calculate the values for dimensionless parameters
 		self.p_inf = self.population/(self.width*self.height) #starting density of bacteria
 		self.D_star = (D_c*tau)/(L*L)
 		self.c_star = 1
 		self.beta_star = (beta*self.p_inf*tau)/(c_0*self.width*self.height)
-		#self.beta_star = 1E-8#practise placeholder parameter
 
-		#generate grid to solve the concentration over 
+
+		#generate grid to solve the concentration over
 		self.u0 = self.c_star * np.ones((self.nx+1, self.ny+1)) #starting concentration of bacteria
 		self.u = self.u0.copy() #current concentration of bacteria - updating through each timestep
-
 
 		#store the location of the band at each timepoint
 		self.band_location = []  # intialise list to store the location of the band at each dt
@@ -78,7 +77,7 @@ class Tube(Model):
 
 			#have the initial position start at the centre of the y axis
 			x = 0
-            #x = self.width/2 #uncomment to position bacteria in the centre of the modelling space 
+            #x = self.width/2 #uncomment to position bacteria in the centre of the modelling space
 			y = self.height/2
 
 			#x = self.width/2
@@ -92,7 +91,7 @@ class Tube(Model):
 				self.height,
 				False,
 				self.name,
-				"tumble"
+				"tumble",
 			)
 			self.space.place_agent(bacteria, pos)
 			self.schedule.add(bacteria)
@@ -128,7 +127,7 @@ class Tube(Model):
 					self.height,
 					True,
 					self.name,
-					"tumble"
+					"tumble",
 				)
 				self.space.place_agent(bacteria, pos)
 				self.schedule.add(bacteria)
@@ -221,17 +220,71 @@ class Tube(Model):
 		#update the list of band locations
 		self.band_location.append(max_dens_loc)
 
+	def neighbourCollide(self):
+		"""
+		Check if neighbours  colliding using a grid. If neighbours collide perform an inelastic collision.
+		If there is two cells with the same angle consider these the same cell
+		"""
+
+		all_agents = self.schedule.agents
+		agent_positions = [all_agents[i].pos for i in range(len(all_agents))]
+
+		#round the list of positions using the radius
+		r = 4
+		agent_pos_rounded = [(round(position[0], r),round(position[1], r)) for position in agent_positions]
+
+		#next - see if occur more than once then these bacteria must collide
+		position_counter = Counter(agent_pos_rounded)
+		counter_df = pd.DataFrame.from_dict(position_counter, orient='index').reset_index()
+		colliders = counter_df[counter_df[0] > 1]
+		collider_points = colliders['index'].values
+
+
+		#loop through the colliding points
+		for point in collider_points:
+
+			#get the index corresponding to the point
+			idx = [i for i, d in enumerate(agent_pos_rounded) if d == point]
+
+			#form an inelastic collision
+			self.inelasticCollision(idx)
+
+	def inelasticCollision(self, agent_list):
+		"""
+		Generate a new angle for the bacteria from the orignal lognormal distribution.
+		Potential to change this function to relfect the actual behaviour
+		"""
+
+		#loop through each of the colliding agents
+		for idx in agent_list:
+
+			#reset the angle
+			self.schedule.agents[idx].ang = self.schedule.agents[idx].getTumbleAngle(self.schedule.agents[idx].ang_mean, self.schedule.agents[idx].ang_std)
+
+
 	def step(self):
+
+		#perform a step
 		self.schedule.step()
 		self.stepConcentration()
+
+		#correct for neighbouring bacteria which have collided
+		#ignore the first tick as everything will collide
+		if self.ticks > 1:
+			self.neighbourCollide()
+
+		#let bacteria reproduce
 		self.bacteriaReproduce()
+
 		#update the number of ticks which have occured
 		self.ticks = self.ticks + 1
-		if self.ticks % 10 == 0: 
+		if self.ticks % 10 == 0:
 			print('TIME ELAPSED: '+ str(self.ticks*self.dt)+ ' seconds', flush = True)
 
 def compute_concentration(model):
 	return model.u
+
+
 
 
 
