@@ -63,7 +63,7 @@ class Bacteria(Agent):
             self.duration = self.getDuration(self.mean_tumble) #duration of the first run
 
         if self.pattern == "reverse":
-            self.reverse_std = 20 #standard deviation of angle
+            self.reverse_std = 10 #standard deviation of angle
             self.status = 1 #1 is running, 2 is extending a run
             self.duration = self.getDuration(mean_run) #duration of the first run
 
@@ -388,8 +388,7 @@ class Bacteria(Agent):
 
         # get a new angle
         reverse_ang = np.random.normal(180, self.reverse_std, 1)
-        reverse_direction = random.randint(0, 1)
-        self.ang = (self.ang + reverse_ang * reverse_direction) % 360
+        self.ang = (self.ang + reverse_ang) % 360
 
         # get a duration for the new run
         self.duration = self.getDuration(mean_run)
@@ -402,8 +401,7 @@ class Bacteria(Agent):
         
         #get a new angle
         flick_ang = np.random.normal(90, self.flick_std,1) 
-        flick_direction = random.randint(0,1)
-        self.ang = (self.ang + flick_ang * flick_direction) % 360 
+        self.ang = (self.ang + flick_ang) % 360 
         
         #get a duration for the flick 
         self.duration = self.getDuration(mean_run)
@@ -463,7 +461,7 @@ class Bacteria(Agent):
             #save only every 10 second
             if self.step_counter % 1000 == 0:
                 pos_df = pd.DataFrame({'position': pos_list})
-                pos_df .to_csv('example_position_list_tumble.csv', index = False)
+                pos_df .to_csv('example_position_list_reverse2.csv', index = False)
         
 
         #hdebugging lines which can be uncommented
