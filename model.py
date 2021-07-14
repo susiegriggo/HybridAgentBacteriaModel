@@ -13,7 +13,7 @@ from mesa import Model
 from mesa.space import ContinuousSpace
 from mesa.time import RandomActivation
 
-from bacteria_test import Bacteria
+from bacteria import Bacteria
 from collections import Counter
 
 #set global variables for the tube model
@@ -60,7 +60,7 @@ class Tube(Model):
 
 		#calculate value for beta_star using the parameters 
 		#self.beta_star = (beta*self.p_inf*tau)/(c_0*self.width*self.height)
-		beta_star = 10E-7 #placeholder consumption term 
+		self.beta_star = 10E-7 #placeholder consumption term
 
 		#generate grid to solve the concentration over
 		self.u0 = self.c_star * np.ones((self.nx+1, self.ny+1)) #starting concentration of bacteria
@@ -78,7 +78,8 @@ class Tube(Model):
 
 			#have the initial position start at the centre of the y axis
 			x = 0
-            		#x = self.width/2 #uncomment to position bacteria in the centre of the modelling space
+			x = self.width/2
+            #x = self.width/2 #uncomment to position bacteria in the centre of the modelling space
 			y = self.height/2
 
 			#x = self.width/2
@@ -93,7 +94,6 @@ class Tube(Model):
 				False,
 				self.name,
 				"tumble",
-				2.41E-3,
 			)
 			self.space.place_agent(bacteria, pos)
 			self.schedule.add(bacteria)
@@ -209,7 +209,6 @@ class Tube(Model):
 	def detectBand(self, dens_df):
 		"""
 		Detect the band in the tube by evaluating the mean bacterial density across each row
-		:return:
 		"""
 		dens_df = dens_df.T
 		col_means = dens_df.values.mean(axis=0)
@@ -233,7 +232,7 @@ class Tube(Model):
 		agent_positions = [all_agents[i].pos for i in range(len(all_agents))]
 
 		#round the list of positions using the radius
-		r = 4
+		r = 4 #round to 4 decimals - consistent with 1 micron radius
 		agent_pos_rounded = [(round(position[0], r),round(position[1], r)) for position in agent_positions]
 
 		#next - see if occur more than once then these bacteria must collide
@@ -241,7 +240,6 @@ class Tube(Model):
 		counter_df = pd.DataFrame.from_dict(position_counter, orient='index').reset_index()
 		colliders = counter_df[counter_df[0] > 1]
 		collider_points = colliders['index'].values
-
 
 		#loop through the colliding points
 		for point in collider_points:
@@ -257,12 +255,34 @@ class Tube(Model):
 		Generate a new angle for the bacteria from the orignal lognormal distribution.
 		Potential to change this function to relfect the actual behaviour
 		"""
+		#if there are multiple colliding agents just collide the two with the shortest Euclidean distance
+		if len(agent_list) > 2:
 
-		#loop through each of the colliding agents
-		for idx in agent_list:
+			shortest_dist = self.width #placeholder for the shortest gap in the collision
+			shortest_pair = 0 #placeholder for the shortest pair
 
-			#reset the angle
-			self.schedule.agents[idx].ang = self.schedule.agents[idx].getTumbleAngle(self.schedule.agents[idx].ang_mean, self.schedule.agents[idx].ang_std)
+			#loop through all possible pairs of agents
+			for i in range(0, len(agent_list)):
+
+				for j in range(i+1, len(agent_list)):
+
+					#calculate the distance between these points
+					dist = np.linalg.norm(np.array(self.schedule.agents[i].pos)-np.array(self.schedule.agents[j].pos))
+
+					#if the distance is shortest than those previously seen use those agents
+					if dist < shortest_dist:
+						shortest_dist = dist
+						shortest_pair = [i,j]
+
+			#update the agent indexes to represent this shortest pair
+			agent_list = shortest_pair
+
+		#perform the collision by swapping the angles (simulate an incidence angle)
+		angle_0 = self.schedule.agents[agent_list[0]].ang
+		angle_1 = self.schedule.agents[agent_list[1]].ang
+
+		self.schedule.agents[agent_list[0]].ang = angle_1
+		self.schedule.agents[agent_list[1]].ang = angle_0
 
 
 	def step(self):

@@ -19,7 +19,7 @@ velocity_std = 6E-4 #standrd deviation of the velocity
 mean_run = 1 #mean duration of a run
 
 #wall effects
-arch_collision = 0  #probability of an arch collision
+arch_collision = 0 #probability of an arch collision
 tangent_collision = 1 - arch_collision #probability of a tangential deflection collision
 
 class Bacteria(Agent):
@@ -167,7 +167,10 @@ class Bacteria(Agent):
             p = random.uniform(0, 1)
 
             if p > arch_collision:
-                self.ang = self.ang+90 
+                if self.ang > 180:
+                    self.ag = (self.ang + 90) % 360
+                else:
+                    self.ang = (self.ang - 90) % 360
 
         #bacteria are hitting the right wall
         elif x > model_width:
@@ -175,8 +178,11 @@ class Bacteria(Agent):
 
             p = random.uniform(0, 1)
 
-            if p > arch_collision: 
-                self.ang = self.ang+90
+            if p > arch_collision:
+                if self.ang > 180:
+                    self.ang = (self.ang - 90) % 360
+                else:
+                    self.ang = (self.ang + 90) % 360
 
         #bacteria are hitting the bottom wall
         if y < 0:
@@ -185,16 +191,21 @@ class Bacteria(Agent):
             p = random.uniform(0, 1)
 
             if p > arch_collision:
-                self.ang = self.ang+90
+                if self.ang > 270:
+                    self.ang = (self.ang + 90)% 360
+                else:
+                    self.ang = (self.ang - 90)%360
 
         #bacteria are hitting the top wall
         elif y > model_height:
             y = model_height-epsilon
-
             p = random.uniform(0, 1)
 
-            if p >  arch_collision:
-                self.ang = self.ang+90
+            if p > arch_collision:
+                if self.ang < 90:
+                    self.ang = (self.ang - 90) % 360
+                else:
+                    self.ang = (self.ang + 90) % 360
 
         return [x,y]
 
@@ -512,14 +523,12 @@ class Bacteria(Agent):
         if self.pattern == 'flick':
             self.reverseFlickStep()
 
-	
         #save the motility pattern of one of the cells 
         if self.unique_id == 1:
-            self.step_counter = self.step_counter + 1
-            pos_list.append(self.pos)
+            self.pos_list.append(self.pos)
 
             #save only every 10 second
-            if self.step_counter % 1000 == 0:
+            if self.ticks % 1000 == 0:
                 pos_df = pd.DataFrame({'position': pos_list})
                 pos_df .to_csv('example_position_list_tumble.csv', index = False)
 
