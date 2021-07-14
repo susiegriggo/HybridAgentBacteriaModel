@@ -5,18 +5,14 @@ import numpy as np
 import random
 import pandas as pd
 from mesa import Agent
-import math
 
-radius = 2*10E-4  # cm
-D_rot = 0.062 #rational diffusion coefficient radians^2/s
-D_rot = D_rot*10E-9 #change the units to cm
+radius = 10E-4  # cm
+D_rot = 0.062*10E-9 #change the units to cm
 epsilon = 10E-16#adjusts edges of the modelling space- must be sufficiently small or causes errors with wall effects
 
-alpha =  0.5  #bias of the bacteria to the nutrients it is consuming based on the previous run duration
+alpha =  2  #bias of the bacteria to the nutrients it is consuming based on the previous run duration
 doubling_mean = 360
 doubling_std = 20
-#doubling_mean = 10E+26
-#doubling_std = 0
 
 velocity_mean = 2.41E-3 #mean velocity in cm/s
 velocity_std = 6E-4 #standrd deviation of the velocity
@@ -162,6 +158,11 @@ class Bacteria(Agent):
             if p >= arch_collision:
                 self.ang = 180-self.ang
 
+            #do a tumble to see if this gets the tumble to occur
+            else:
+                self.status = 0
+                self.timer = 0
+                self.duration = self.getDuration(self.mean_tumble)
 
         #bacteria are hitting the right wall
         elif x > model_width:
@@ -175,6 +176,11 @@ class Bacteria(Agent):
             #perform tangent colision otherwise arch
             if p >= arch_collision:
                 self.ang = 180-self.ang
+
+            else:
+                self.status = 0
+                self.timer = 0
+                self.duration = self.getDuration(self.mean_tumble)
 
         #bacteria are hitting the top wall
         if y < 0:
@@ -190,6 +196,11 @@ class Bacteria(Agent):
                 self.ang = 360-self.ang
             #self.ang = self.ang*-1
 
+            else:
+                self.status = 0
+                self.timer = 0
+                self.duration = self.getDuration(self.mean_tumble)
+
         #bacteria are hitting the bottom wall
         elif y > model_height:
 
@@ -202,6 +213,11 @@ class Bacteria(Agent):
             #perform tangent collision otherwise arch
             if p >= arch_collision:
                 self.ang = 360 - self.ang
+
+            else:
+                self.status = 0
+                self.timer = 0
+                self.duration = self.getDuration(self.mean_tumble)
 
         return [x,y]
 
@@ -256,6 +272,49 @@ class Bacteria(Agent):
                 collider.velocity = 0
                 #collider.ang = (self.getTumbleAngle(self.ang_mean, self.ang_std) +self.ang)
                 #collider.ang = collider.ang %360
+
+    def inelasticCollision(self, collider):
+        """
+        Reset the angle and velocity of two colliding cells
+        TODO remove this function
+        """
+
+        #get the difference between the two angles
+        ang_diff = (self.ang - collider.ang) % 360
+
+        theta = 0 #placeholder for angle
+        new_velocity = 0 #placeholder for velocity
+
+        #apply the formula if the difference is greater than 90 degrees:
+        if ang_diff > 90:
+
+            #get angle
+            phi = ang_diff - 90
+            theta = np.arctan((collider.velocity * np.cos(np.deg2rad(phi)))/(collider.velocity*np.sin(np.deg2rad(phi))+self.velocity))
+            theta = np.rad2deg(theta)
+
+            #get velocity
+            new_velocity = (collider.velocity*np.cos(np.deg2rad(phi)))/(2*np.sin(np.deg2rad(theta)))
+
+        if ang_diff <= 90:
+
+            #get angle
+            phi = ang_diff
+            theta = np.arctan((collider.velocity * np.sin(np.deg2rad(phi)))/(self.velocity + collider.velocity*np.cos(np.deg2rad(phi))))
+            theta = np.rad2deg(theta)
+
+            #get velocity
+            new_velocity = (collider.velocity*np.sin(np.deg2rad(phi)))/(2*np.sin(np.deg2rad(theta)))
+
+        #get the new angle and set
+        new_angle = (180 + theta + self.ang) % 360
+        self.ang = new_angle
+        collider.ang = new_angle
+
+        #set the new velocity to the agents
+        self.velocity = new_velocity
+        collider.velocity = new_velocity
+
 
     def tumbleStep(self):
         """
@@ -373,8 +432,7 @@ class Bacteria(Agent):
                 if self.c_end > self.c_start:
                     self.duration = alpha * self.duration 
                     # self.duration = alpha * self.getDuration(mean_run)
-                    self.status = 3               
-		     
+                    self.status = 3
 
                 #if not then flick
                 else:
@@ -421,7 +479,7 @@ class Bacteria(Agent):
             self.next_double = np.random.normal(doubling_mean, doubling_std, 1)
 
         #check if the bacteria is about to collide
-        self.neighbourCollide()
+        #self.neighbourCollide()
 
         #get the current timestep in the run/tumble
         step_num = int(self.timer/self.dt)
@@ -465,14 +523,6 @@ class Bacteria(Agent):
                 pos_df = pd.DataFrame({'position': pos_list})
                 pos_df .to_csv('example_position_list_tumble.csv', index = False)
         
-
-        #hdebugging lines which can be uncommented
-        #print('run duration: '+str(self.duration))
-        #print('run timer: '+str(self.timer))
-        #print('status: '+str(self.status))
-        #print('angle: '+str(self.ang))
-        #print('velocity: '+str(self.velocity))
-        #print('')
 
 
 
