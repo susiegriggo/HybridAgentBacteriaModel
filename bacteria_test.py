@@ -447,8 +447,7 @@ class Bacteria(Agent):
 
         # get a new angle
         reverse_ang = np.random.normal(180, self.reverse_std, 1)
-        reverse_direction = random.randint(0, 1)
-        self.ang = (self.ang + reverse_ang * reverse_direction) % 360
+        self.ang = (self.ang + reverse_ang) % 360
 
         # get a duration for the new run
         self.duration = self.getDuration(mean_run)
@@ -461,8 +460,7 @@ class Bacteria(Agent):
 
         # get a new angle
         flick_ang = np.random.normal(90, self.flick_std, 1)
-        flick_direction = random.randint(0, 1)
-        self.ang = (self.ang + flick_ang * flick_direction) % 360
+        self.ang = (self.ang + flick_ang) % 360
 
         # get a duration for the flick
         self.duration = self.getDuration(self.mean_run)
