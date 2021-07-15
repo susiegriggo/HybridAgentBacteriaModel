@@ -18,7 +18,7 @@ from collections import Counter
 
 #set global variables for the tube model
 D_c = 1.e-10 #diffusion coefficient of the nutrients
-c_0= 5.56E-3 #intial concentration of glucose in the tube
+c_0= 6E-3 #intial concentration of molecules in the tube
 beta = 5E-18 #number of moles of glucose consumed per bacteria per second
 radius = 1*10E-4 #radius of bacteria in centimetres
 
@@ -36,13 +36,30 @@ class Tube(Model):
 		population=100,
 		width=100,
 		height=100,
-		name = " "
+		name = " ",
+		pattern = "tumble",
+		beta_star = False,
+		c_star = False,
 
 	):
+
+		"""
+		Create a model object
+		Args:
+			population: number of agents starting in the model
+			width: width of the modelling space in cm
+			height: height of the modelling space in cm
+			name: name given as a prefix for the model files
+			pattern: movement pattern to use in the model
+			beta_star = dimensionless consumption term
+			c_star = dimensionless starting concentration
+		"""
+
 		self.population = population
 		self.width = width
 		self.height = height
 		self.name = name
+		self.pattern = pattern
 		self.dx = 0.001 #size of grid increments
 		self.dt = 0.01 #length of the timesteps in the model
 		self.nx = int(width/self.dx) #number of increments in x direction
@@ -56,11 +73,18 @@ class Tube(Model):
 		#calculate the values for dimensionless parameters
 		self.p_inf = self.population/(self.width*self.height) #starting density of bacteria
 		self.D_star = (D_c*tau)/(L*L)
-		self.c_star = 1
 
-		#calculate value for beta_star using the parameters 
-		#self.beta_star = (beta*self.p_inf*tau)/(c_0*self.width*self.height)
-		self.beta_star = 10E-7 #placeholder consumption term
+		#if value for c_star is not parsed calculated set to 1
+		if not c_star:
+			self.c_star = 1
+		else:
+			self.c_star = c_star
+
+		#if a value for beta_star is not given calculate manually
+		if not beta_star:
+			self.beta_star = (beta*self.p_inf*tau)/(c_0*self.width*self.height)
+		else:
+			self.beta_star = beta_star
 
 		#generate grid to solve the concentration over
 		self.u0 = self.c_star * np.ones((self.nx+1, self.ny+1)) #starting concentration of bacteria
@@ -77,8 +101,7 @@ class Tube(Model):
 		for i in range(self.population):
 
 			#have the initial position start at the centre of the y axis
-			x = 0
-			x = self.width/2
+			x = self.width/1000
             #x = self.width/2 #uncomment to position bacteria in the centre of the modelling space
 			y = self.height/2
 
@@ -93,11 +116,10 @@ class Tube(Model):
 				self.height,
 				False,
 				self.name,
-				"tumble",
+				self.pattern,
 			)
 			self.space.place_agent(bacteria, pos)
 			self.schedule.add(bacteria)
-
 
 	def bacteriaReproduce(self):
 		"""
@@ -129,7 +151,7 @@ class Tube(Model):
 					self.height,
 					True,
 					self.name,
-					"tumble",
+					self.pattern,
 					2.41E-3,
 				)
 				self.space.place_agent(bacteria, pos)
@@ -248,9 +270,9 @@ class Tube(Model):
 			idx = [i for i, d in enumerate(agent_pos_rounded) if d == point]
 
 			#form an inelastic collision
-			self.inelasticCollision(idx)
+			self.getCollision(idx)
 
-	def inelasticCollision(self, agent_list):
+	def getCollision(self, agent_list):
 		"""
 		Generate a new angle for the bacteria from the orignal lognormal distribution.
 		Potential to change this function to relfect the actual behaviour
@@ -283,7 +305,6 @@ class Tube(Model):
 
 		self.schedule.agents[agent_list[0]].ang = angle_1
 		self.schedule.agents[agent_list[1]].ang = angle_0
-
 
 	def step(self):
 

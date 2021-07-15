@@ -44,7 +44,7 @@ class Bacteria(Agent):
 	    doubling_std = 20, 
     ):
         """
-        Create a new Bacteria
+        Create a new Bacteria agent
 
         Args:
             unique_id: Unique agent identifier.
@@ -55,6 +55,12 @@ class Bacteria(Agent):
 
         """
         super().__init__(unique_id, model)
+
+        #throw exception if the wrong types of values are passed
+        pattern_type = ['tumble', 'reverse', 'flick'] #possible movement patterns
+        if pattern not in pattern_type:
+            raise ValueError("Pattern must be one of tumble, reverse or flick")
+
         self.unique_id = unique_id
         self.pos = np.array(pos)
         self.model_name = model_name
@@ -73,6 +79,7 @@ class Bacteria(Agent):
             self.ang_std = 37
             self.mean_tumble = 0.1
             self.duration = self.getDuration(self.mean_tumble)  # stores the time of the duration
+            self.status = 0  #starting status, tumble = 0 , run = 1
 
         if self.pattern == 'reverse':
             self.reverse_std = 20  # standard deviation of angle
@@ -85,10 +92,9 @@ class Bacteria(Agent):
             self.reverse_std = 2  # standard deviation of a reverse
             self.duration = self.getDuration(self.mean_run)  # duration of the first run
 
-        self.status = 0 #determines whether running or tumbling. 0 is tumbling, 1 is running, 2 is extending a run
         self.dt = 0.01 #time for each tick in the simulation
         self.timer = 0  #traces where up to on the current run/tumble
-        self.ang = 0 #angle for running
+        self.ang = np.random.uniform(0, 359, 1) #give a random angle to the cell to start
 
         self.pos_list = []
         self.ticks = 1
@@ -199,6 +205,7 @@ class Bacteria(Agent):
         #bacteria are hitting the top wall
         elif y > model_height:
             y = model_height-epsilon
+
             p = random.uniform(0, 1)
 
             if p > arch_collision:
@@ -305,7 +312,6 @@ class Bacteria(Agent):
                     self.duration = alpha * self.duration
                     # self.duration = alpha * self.getDuration(mean_run)
                     self.status = 2
-
 
                 # if it is not increasing then reverse
                 else:
