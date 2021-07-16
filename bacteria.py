@@ -10,7 +10,7 @@ radius = 10E-4  # cm
 D_rot = 0.062*10E-9 #change the units to cm
 epsilon = 10E-16#adjusts edges of the modelling space- must be sufficiently small or causes errors with wall effects
 
-alpha =  2  #bias of the bacteria to the nutrients it is consuming based on the previous run duration
+alpha =  0.5  #bias of the bacteria to the nutrients it is consuming based on the previous run duration
 doubling_mean = 360
 doubling_std = 20
 
@@ -529,6 +529,8 @@ class Bacteria(Agent):
         if self.pattern == 'flick':
             self.reverseFlickStep()
 
+
+"""
         #save the motility pattern of one of the cells 
         if self.unique_id == 1:
             self.pos_list.append(self.pos)
@@ -540,7 +542,7 @@ class Bacteria(Agent):
 
         #add the tick just completed
         self.ticks = self.ticks + 1
-
+"""
 
 
 
