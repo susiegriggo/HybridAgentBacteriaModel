@@ -68,7 +68,8 @@ class Bacteria(Agent):
         self.doubling_mean = doubling_mean
         self.doubling_std = doubling_std
         self.velocity_mean = velocity_mean 
-        self.velocity_std = velocity_std 
+        self.velocity_std = velocity_std
+        self.model = model  # link to the corresponding model object
 
         #parameters universal to all motility patterns
         self.velocity = np.random.normal(self.velocity_mean, self.velocity_std, 1)
@@ -220,26 +221,21 @@ class Bacteria(Agent):
         """
         Get the concentration of attractant at a location for the currently saved concentration field
         """
-        conc_file = str(self.model_name) + '_concentration_field.csv'
-        conc_field = pd.read_csv(conc_file, sep=',')
 
-        #get the number of columns and rows in the concentration field
-        conc_nx = len(conc_field.columns) - 1
-        conc_ny = len(conc_field) - 1
 
-        #get the increase in each direction per unit time
-        conc_dx = model_width/conc_nx
-        conc_dy = model_height/conc_ny
+        # get the increase in each direction per unit time
+        conc_dx = model_width / self.model.nx
+        conc_dy = model_height / self.model.ny
 
-        #find the number of decimal places to round the position to
-        round_dx = np.log10(conc_dx)*-1
-        round_dy = np.log10(conc_dy)*-1
+        # find the number of decimal places to round the position to
+        round_dx = np.log10(conc_dx) * -1
+        round_dy = np.log10(conc_dy) * -1
 
-        #get the concentration corresponding to this rounded concetration
-        field_pos = [int(round(self.pos[0],int(round_dx))/conc_dx), int(round(self.pos[1], int(round_dy))/conc_dy)]
+        # get the concentration corresponding to this rounded concetration
+        field_pos = [int(round(self.pos[0], int(round_dx)) / conc_dx), int(round(self.pos[1], int(round_dy)) / conc_dy)]
 
         #get this position in the concentration dataframe
-        current_pos = conc_field.loc[field_pos[1]][field_pos[0]]
+        current_pos = self.model.u[field_pos[0], field_pos[1]]
         return current_pos
 
     def tumbleStep(self):
@@ -514,12 +510,14 @@ class Bacteria(Agent):
 
         #add this timestep to the timer
         self.timer = self.timer + self.dt
+        self.ticks = self.ticks + 1
         #update the time until the next double
         self.next_double = self.next_double - self.dt
 
         #update the wiener processes for rotational diffusion
         self.W_x = self.W_x + np.sqrt(self.dt) * np.random.normal(0,1,1)
         self.W_y = self.W_y + np.sqrt(self.dt) * np.random.normal(0,1,1)
+
 
         # check if the status of the cell needs to be changed
         if self.pattern == 'tumble':
@@ -539,10 +537,10 @@ class Bacteria(Agent):
             if self.ticks % 1000 == 0:
                 pos_df = pd.DataFrame({'position': pos_list})
                 pos_df .to_csv('example_position_list_tumble.csv', index = False)
-
-        #add the tick just completed
-        self.ticks = self.ticks + 1
 """
+        #add the tick just completed
+
+
 
 
 
