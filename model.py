@@ -8,13 +8,16 @@ Multiple model objects can be created - allowing for multiple simulations to be 
 import numpy as np
 import statsmodels.api as sm
 import pandas as pd
+import time
+import heapq
+from collections import Counter
 
 from mesa import Model
 from mesa.space import ContinuousSpace
 from mesa.time import RandomActivation
 
 from bacteria import Bacteria
-from collections import Counter
+
 
 #set global variables for the tube model
 D_c = 1.e-10 #diffusion coefficient of the nutrients
@@ -40,6 +43,7 @@ class Tube(Model):
         pattern = "tumble",
         beta_star = False,
         c_star = False,
+        n_jobs = 8
 
     ):
 
@@ -56,18 +60,19 @@ class Tube(Model):
         """
 
         self.population = int(population)
-	self.model = model #link to the corresponding model object 
         self.width = width
         self.height = height
         self.prefix =  str(name)+'_pop'+str(self.population)
         self.pattern = pattern
-        self.dx = 0.01 #size of grid increments
+        self.n_jobs = n_jobs #number of cpus to use for kde
+        self.dx = 0.001 #size of grid increments
         self.dt = 0.01 #length of the timesteps in the model
         self.nx = int(width/self.dx) #number of increments in x direction
         self.ny = int(height/self.dx) #number of increments in y direction
         self.ticks = 1 #count the number of ticks which have elapsed
         self.schedule = RandomActivation(self)
         self.space = ContinuousSpace(width, height, False)
+
     
         #calculate the values for dimensionless parameters
         self.p_inf = self.population/(self.width*self.height) #starting density of bacteria
@@ -182,14 +187,16 @@ class Tube(Model):
         #generate a grid
         X, Y = np.mgrid[0:self.width:(self.nx + 1) * 1j, 0:self.height:(self.ny + 1) * 1j]
         #get the coordinates in the grid
+
         positions = np.vstack([X.ravel(), Y.ravel()])
-
-        dens = sm.nonparametric.KDEMultivariate(data = agent_positions, var_type = 'cc')
-
+        settings = sm.nonparametric.EstimatorSettings(efficient=False, n_jobs = self.n_jobs)
+        dens = sm.nonparametric.KDEMultivariate(data = agent_positions, var_type = 'cc', defaults=settings)
+        start = time.time()
         #get the density at each grid point
-        bact_dens = dens.pdf(positions)
+        bact_dens = dens.pdf(positions) #TODO this is the slow line
+        end = time.time()
+        print(end - start)
         bact_dens = np.reshape(bact_dens.T, X.shape)
-
         if np.isnan(np.min(bact_dens)) == True:
             bact_dens = np.zeros((bact_dens.shape))
 
@@ -203,6 +210,7 @@ class Tube(Model):
         dx2, dy2 = self.dx * self.dx, self.dx * self.dx
 
         #get the gaussian density kernel of the bacteria
+
         bacterial_density = self.densityKernel().T
 
         self.u[1:-1, 1:-1] = self.u0[1:-1, 1:-1] + self.D_star * self.dt * ((self.u0[2:, 1:-1] - 2 * self.u0[1:-1, 1:-1] + self.u0[:-2, 1:-1]) / dx2 + (
@@ -213,17 +221,16 @@ class Tube(Model):
         # incorporate the bacteria into this using vectorisation
         self.u0 = self.u.copy()
 
-        #have the concentration save to a file such that it can be read by the agents
-        u_df = pd.DataFrame(self.u)
-        conc_file = str(self.prefix)+'_concentration_field.csv'
-        u_df.to_csv(conc_file, index = False)
-
         dens_df = pd.DataFrame(bacterial_density)
 
         #save updated versions of the density and concentration periodically
         if self.ticks % 100 == 0: #save every 100 ticks (i.e every 10 seconds)
             concfield_name = str(self.prefix)+'_concentration_field_'+str(self.ticks) + "_ticks.csv"
             densfield_name = str(self.prefix)+'_density_field_' +str(self.ticks) + "_ticks.csv"
+
+            u_df = pd.DataFrame(self.u)
+            conc_file = str(self.prefix)+'_concentration_field.csv'
+            u_df.to_csv(conc_file, index = False)
             u_df.to_csv(concfield_name, index = False)
             dens_df.to_csv(densfield_name, index = False)
 
@@ -276,8 +283,9 @@ class Tube(Model):
             #get the index corresponding to the point
             idx = [i for i, d in enumerate(agent_pos_rounded) if d == point]
 
-            #form an inelastic collision
+            #form a collision
             self.getCollision(idx)
+
 
     def getCollision(self, agent_list):
         """
@@ -287,23 +295,12 @@ class Tube(Model):
         #if there are multiple colliding agents just collide the two with the shortest Euclidean distance
         if len(agent_list) > 2:
 
-            shortest_dist = self.width #placeholder for the shortest gap in the collision
-            shortest_pair = 0 #placeholder for the shortest pair
+            position_list = [self.schedule.agents[i].pos for i in range(len(agent_list))]
+            close_points = closest_points(position_list, 2)
 
-            #loop through all possible pairs of agents
-            for i in range(0, len(agent_list)):
+            #get the indexes of these points
+            shortest_pair = [position_list.index(close_points[0]), position_list.index(close_points[0])]
 
-                for j in range(i+1, len(agent_list)):
-
-                    #calculate the distance between these points
-                    dist = np.linalg.norm(np.array(self.schedule.agents[i].pos)-np.array(self.schedule.agents[j].pos))
-
-                    #if the distance is shortest than those previously seen use those agents
-                    if dist < shortest_dist:
-                        shortest_dist = dist
-                        shortest_pair = [i,j]
-
-            #update the agent indexes to represent this shortest pair
             agent_list = shortest_pair
 
         #perform the collision by swapping the angles (simulate an incidence angle)
@@ -332,8 +329,9 @@ class Tube(Model):
         if self.ticks % 10 == 0:
             print('TIME ELAPSED: '+ str(self.ticks*self.dt)+ ' seconds', flush = True)
 
-def compute_concentration(model):
-    return model.u
+def closest_points(list_of_tuples, n=2):
+    """Method to efficiently compute the two closest points in space"""
+    return heapq.nsmallest(n, list_of_tuples, lambda pnt:abs(pnt[0]))
 
 
 
