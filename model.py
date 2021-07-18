@@ -5,19 +5,20 @@ The density of bacteria is approximated using kernel density estimation.
 Multiple model objects can be created - allowing for multiple simulations to be run as replicates
 """
 
-import numpy as np
-import statsmodels.api as sm
-import pandas as pd
-import time
-import heapq
-from collections import Counter
-
 from mesa import Model
 from mesa.space import ContinuousSpace
 from mesa.time import RandomActivation
-
 from bacteria import Bacteria
 
+
+#if __name__ == '__main__':
+import numpy as np
+import statsmodels.api as sm
+import pandas as pd
+from sklearn.neighbors import KernelDensity
+import heapq
+from collections import Counter
+import time
 
 #set global variables for the tube model
 D_c = 1.e-10 #diffusion coefficient of the nutrients
@@ -37,11 +38,11 @@ class Tube(Model):
     def __init__(
         self,
         population=100,
-        width=100,
-        height=100,
+        width_=100,
+        height_=100,
         name = " ",
         pattern = "tumble",
-        beta_star = False,
+        beta_star = 10E-7,
         c_star = False,
         n_jobs = 8
 
@@ -60,20 +61,19 @@ class Tube(Model):
         """
 
         self.population = int(population)
-        self.width = width
-        self.height = height
+        self.width = width_
+        self.height = height_
         self.prefix =  str(name)+'_pop'+str(self.population)
         self.pattern = pattern
         self.n_jobs = n_jobs #number of cpus to use for kde
         self.dx = 0.001 #size of grid increments
         self.dt = 0.01 #length of the timesteps in the model
-        self.nx = int(width/self.dx) #number of increments in x direction
-        self.ny = int(height/self.dx) #number of increments in y direction
+        self.nx = int(width_/self.dx) #number of increments in x direction
+        self.ny = int(height_/self.dx) #number of increments in y direction
         self.ticks = 1 #count the number of ticks which have elapsed
         self.schedule = RandomActivation(self)
-        self.space = ContinuousSpace(width, height, False)
+        self.space = ContinuousSpace(width_, height_, False)
 
-    
         #calculate the values for dimensionless parameters
         self.p_inf = self.population/(self.width*self.height) #starting density of bacteria
         self.D_star = (D_c*tau)/(L*L)
@@ -90,10 +90,10 @@ class Tube(Model):
         else:
             self.beta_star = beta_star
 
-        #update the prefix with these terms 
+        #update the prefix with these terms
         self.prefix = self.prefix + '_betastar'+str(self.beta_star)+'_cstar'+str(self.c_star)
 
-        #create agents 
+        #create agents
         self.make_agents()
         self.running = True
 
@@ -103,8 +103,15 @@ class Tube(Model):
 
         #store the location of the band at each timepoint
         self.band_location = []  # intialise list to store the location of the band at each dt
-        
-        
+
+        global dx, width, height, nx, ny
+        dx = self.dx
+        nx = self.nx
+        ny = self.ny
+        width = self.width
+        height = self.height
+
+
     def make_agents(self):
 
         """
@@ -113,8 +120,8 @@ class Tube(Model):
         for i in range(self.population):
 
             #have the initial position start at the centre of the y axis
-            #x = self.width/1000
-            x = self.width/2 #uncomment to position bacteria in the centre of the modelling space
+            x = self.width/1000
+           # x = self.width/2 #uncomment to position bacteria in the centre of the modelling space
             y = self.height/2
 
             #x = self.width/2
@@ -169,38 +176,52 @@ class Tube(Model):
                 self.space.place_agent(bacteria, pos)
                 self.schedule.add(bacteria)
 
-    def densityKernel(self):
+
+    def densityKernel(self, agent_positions):
         """
         Use the Multivariate Gaussian density kernel to calculate the density of bacteria in the tube
         Uses a multivariate kernel estimate. Estimates the bandwidth using Scotts rule.
         """
 
-        # get a list containing all of the agents
-        all_agents = self.schedule.agents
-
-        # get the postions of these agents
-        agent_positions = [all_agents[i].pos for i in range(len(all_agents))]
-
         #determine how many decimals to round to
-        r= round(-1 * np.log10(self.dx))
+        r= round(-1 * np.log10(dx))
 
         #generate a grid
-        X, Y = np.mgrid[0:self.width:(self.nx + 1) * 1j, 0:self.height:(self.ny + 1) * 1j]
-        #get the coordinates in the grid
+        X, Y = np.mgrid[0:width:(nx + 1) * 1j, 0:height:(ny + 1) * 1j]
 
+        #get the coordinates in the grid
         positions = np.vstack([X.ravel(), Y.ravel()])
-        settings = sm.nonparametric.EstimatorSettings(efficient=False, n_jobs = self.n_jobs)
+        settings = sm.nonparametric.EstimatorSettings(efficient=True,n_jobs = 1)
         dens = sm.nonparametric.KDEMultivariate(data = agent_positions, var_type = 'cc', defaults=settings)
-        start = time.time()
-        #get the density at each grid point
-        bact_dens = dens.pdf(positions) #TODO this is the slow line
-        end = time.time()
-        print(end - start)
+        bact_dens = dens.pdf(positions)
+
         bact_dens = np.reshape(bact_dens.T, X.shape)
         if np.isnan(np.min(bact_dens)) == True:
             bact_dens = np.zeros((bact_dens.shape))
 
         return bact_dens.T
+
+    def densityKernel2(self, agent_positions):
+        """
+        Alternative to density kernel function above
+        """
+        #get a list of the x and y values
+        x_list = [position[0] for position in agent_positions]
+        y_list = [position[1] for position in agent_positions]
+        xy = np.vstack([x_list, y_list])
+
+        #calcualte the bandwidth for the computation
+        d = xy.shape[0] #number of dimensions
+        n = xy.shape[1]
+
+        #calculate the bandwidth
+        bw = scottsRule(x_list, y_list)
+        bw = np.mean(bw)
+
+        #calculate the density kernel
+        xx, yy, zz, = kde2D(x_list,y_list,bw, nx+1,ny+1)
+
+        return zz
 
     def stepConcentration(self):
         """
@@ -209,9 +230,16 @@ class Tube(Model):
         """
         dx2, dy2 = self.dx * self.dx, self.dx * self.dx
 
-        #get the gaussian density kernel of the bacteria
+        #get the positions of all agents
+        all_agents = self.schedule.agents
+        agent_positions = [all_agents[i].pos for i in range(len(all_agents))]
 
-        bacterial_density = self.densityKernel().T
+        start = time.time()
+        #get the gaussian density kernel of the bacteria
+        #bacterial_density = self.densityKernel(agent_positions).T
+        bacterial_density = self.densityKernel2(agent_positions)
+        end = time.time()
+        print(end - start)
 
         self.u[1:-1, 1:-1] = self.u0[1:-1, 1:-1] + self.D_star * self.dt * ((self.u0[2:, 1:-1] - 2 * self.u0[1:-1, 1:-1] + self.u0[:-2, 1:-1]) / dx2 + (
                         self.u0[1:-1, 2:] - 2 * self.u0[1:-1, 1:-1] + self.u0[1:-1, :-2]) / dy2) - self.dt * self.beta_star *self.population*bacterial_density[1:-1, 1:-1]
@@ -224,7 +252,7 @@ class Tube(Model):
         dens_df = pd.DataFrame(bacterial_density)
 
         #save updated versions of the density and concentration periodically
-        if self.ticks % 100 == 0: #save every 100 ticks (i.e every 10 seconds)
+        if self.ticks % 10 == 0: #save every 100 ticks (i.e every 10 seconds)
             concfield_name = str(self.prefix)+'_concentration_field_'+str(self.ticks) + "_ticks.csv"
             densfield_name = str(self.prefix)+'_density_field_' +str(self.ticks) + "_ticks.csv"
 
@@ -332,6 +360,32 @@ class Tube(Model):
 def closest_points(list_of_tuples, n=2):
     """Method to efficiently compute the two closest points in space"""
     return heapq.nsmallest(n, list_of_tuples, lambda pnt:abs(pnt[0]))
+
+def kde2D(x, y , bandwidth, xbins, ybins, **kwargs):
+
+    #create a grid of the agent locations
+    xx, yy = np.mgrid[0:width:xbins*1j, 0:height:ybins*1j]
+
+    xy_sample = np.vstack([yy.ravel(), xx.ravel()]).T
+    xy_train = np.vstack([y, x]).T
+
+    #calculate the density kernel
+    kde_skl = KernelDensity(bandwidth=bandwidth, **kwargs)
+    kde_skl.fit(xy_train)
+
+    # score_samples() returns the log-likelihood of the samples
+    z = np.exp(kde_skl.score_samples(xy_sample))
+
+    return xx, yy, np.reshape(z, xx.shape)
+
+def scottsRule(x, y):
+    """Compute bandwidth using Scotts rule. Note that in two-dimensions Scotts rule is equivalent to silvermans rule"""
+    n =  len(x)
+    std = np.array((np.std(x),np.std(y)))
+    return n**(-1./6)*std
+
+
+
 
 
 
