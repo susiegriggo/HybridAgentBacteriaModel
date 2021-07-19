@@ -120,7 +120,7 @@ class Tube(Model):
         for i in range(self.population):
 
             #have the initial position start at the centre of the y axis
-            x = self.width/1000
+            x = self.width/2
            # x = self.width/2 #uncomment to position bacteria in the centre of the modelling space
             y = self.height/2
 
@@ -216,7 +216,6 @@ class Tube(Model):
 
         #calculate the bandwidth
         bw = scottsRule(x_list, y_list)
-        bw = np.mean(bw)
 
         #calculate the density kernel
         xx, yy, zz, = kde2D(x_list,y_list,bw, nx+1,ny+1)
@@ -234,12 +233,12 @@ class Tube(Model):
         all_agents = self.schedule.agents
         agent_positions = [all_agents[i].pos for i in range(len(all_agents))]
 
-        start = time.time()
+        #start = time.time()
         #get the gaussian density kernel of the bacteria
         #bacterial_density = self.densityKernel(agent_positions).T
         bacterial_density = self.densityKernel2(agent_positions)
-        end = time.time()
-        print(end - start)
+        #end = time.time()
+        #print(end - start)
 
         self.u[1:-1, 1:-1] = self.u0[1:-1, 1:-1] + self.D_star * self.dt * ((self.u0[2:, 1:-1] - 2 * self.u0[1:-1, 1:-1] + self.u0[:-2, 1:-1]) / dx2 + (
                         self.u0[1:-1, 2:] - 2 * self.u0[1:-1, 1:-1] + self.u0[1:-1, :-2]) / dy2) - self.dt * self.beta_star *self.population*bacterial_density[1:-1, 1:-1]
@@ -252,7 +251,7 @@ class Tube(Model):
         dens_df = pd.DataFrame(bacterial_density)
 
         #save updated versions of the density and concentration periodically
-        if self.ticks % 10 == 0: #save every 100 ticks (i.e every 10 seconds)
+        if self.ticks % 100 == 0: #save every 100 ticks (i.e every 10 seconds)
             concfield_name = str(self.prefix)+'_concentration_field_'+str(self.ticks) + "_ticks.csv"
             densfield_name = str(self.prefix)+'_density_field_' +str(self.ticks) + "_ticks.csv"
 
@@ -292,28 +291,29 @@ class Tube(Model):
         If there is two cells with the same angle consider these the same cell
         """
 
-        all_agents = self.schedule.agents
+        all_agents = self.schedule.agents 
         agent_positions = [all_agents[i].pos for i in range(len(all_agents))]
 
         #round the list of positions using the radius
-        r = 4 #round to 4 decimals - consistent with 1 micron radius
+        r = 4 #round to 4 decimals - consistent with 1 micron radius 
+        start = time.time() 
         agent_pos_rounded = [(round(position[0], r),round(position[1], r)) for position in agent_positions]
-
+    
         #next - see if occur more than once then these bacteria must collide
         position_counter = Counter(agent_pos_rounded)
         counter_df = pd.DataFrame.from_dict(position_counter, orient='index').reset_index()
         colliders = counter_df[counter_df[0] > 1]
         collider_points = colliders['index'].values
-
+    
         #loop through the colliding points
         for point in collider_points:
-
+    
             #get the index corresponding to the point
             idx = [i for i, d in enumerate(agent_pos_rounded) if d == point]
 
             #form a collision
             self.getCollision(idx)
-
+        
 
     def getCollision(self, agent_list):
         """
@@ -322,10 +322,16 @@ class Tube(Model):
         """
         #if there are multiple colliding agents just collide the two with the shortest Euclidean distance
         if len(agent_list) > 2:
-
+            print('POSITION LIST')
+            start = time.time()
             position_list = [self.schedule.agents[i].pos for i in range(len(agent_list))]
+            end = time.time() 
+            print(end-start) 
+            print('CLOSE POINTS')
+            start = time.time()  
             close_points = closest_points(position_list, 2)
-
+            end = time.time() 
+            print(end-start) 
             #get the indexes of these points
             shortest_pair = [position_list.index(close_points[0]), position_list.index(close_points[0])]
 
@@ -341,17 +347,33 @@ class Tube(Model):
     def step(self):
 
         #perform a step
+        print('STEPPING') 
+        start = time.time()
         self.schedule.step()
-        self.stepConcentration()
+        end = time.time()
+        print(end-start)
 
         #correct for neighbouring bacteria which have collided
         #ignore the first tick as everything will collide
         if self.ticks > 1:
+            print('CONCENTRATION') 
+            start = time.time() 
+            self.stepConcentration()
+            end = time.time() 
+            print(end-start)
+            print('NEIGHBOURS') 
+            start = time.time() 
             self.neighbourCollide()
+            end = time.time()
+            print(end-start) 
 
         #let bacteria reproduce
+        print('REPRODUCING') 
+        start = time.time()
         self.bacteriaReproduce()
-
+        end = time.time() 
+        print(end-start)
+    
         #update the number of ticks which have occured
         self.ticks = self.ticks + 1
         if self.ticks % 10 == 0:
@@ -370,7 +392,7 @@ def kde2D(x, y , bandwidth, xbins, ybins, **kwargs):
     xy_train = np.vstack([y, x]).T
 
     #calculate the density kernel
-    kde_skl = KernelDensity(bandwidth=bandwidth, **kwargs)
+    kde_skl = KernelDensity(bandwidth=bandwidth, algorithm='kd_tree', rtol=0)
     kde_skl.fit(xy_train)
 
     # score_samples() returns the log-likelihood of the samples
@@ -382,7 +404,7 @@ def scottsRule(x, y):
     """Compute bandwidth using Scotts rule. Note that in two-dimensions Scotts rule is equivalent to silvermans rule"""
     n =  len(x)
     std = np.array((np.std(x),np.std(y)))
-    return n**(-1./6)*std
+    return np.mean(std)* n**(-1/6)
 
 
 
