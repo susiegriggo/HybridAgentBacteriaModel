@@ -11,7 +11,7 @@ from mesa.time import RandomActivation
 from bacteria import Bacteria
 
 
-#if __name__ == '__main__':
+#if __name__ == 'model':
 import numpy as np
 import statsmodels.api as sm
 import pandas as pd
@@ -19,6 +19,8 @@ from sklearn.neighbors import KernelDensity
 import heapq
 from collections import Counter
 import time
+from joblib import parallel_backend
+import multiprocessing
 
 #set global variables for the tube model
 D_c = 1.e-10 #diffusion coefficient of the nutrients
@@ -117,6 +119,7 @@ class Tube(Model):
         """
         Create self.population agents, with random positions and starting headings.
         """
+        print(__name__)
         for i in range(self.population):
 
             #have the initial position start at the centre of the y axis
@@ -139,6 +142,7 @@ class Tube(Model):
             )
             self.space.place_agent(bacteria, pos)
             self.schedule.add(bacteria)
+
 
     def bacteriaReproduce(self):
         """
@@ -322,13 +326,11 @@ class Tube(Model):
         """
         #if there are multiple colliding agents just collide the two with the shortest Euclidean distance
         if len(agent_list) > 2:
-            print('POSITION LIST')
-            start = time.time()
-            position_list = [self.schedule.agents[i].pos for i in range(len(agent_list))]
-            end = time.time() 
-            print(end-start) 
-            print('CLOSE POINTS')
-            start = time.time()  
+
+            pool = multiprocessing.Pool(4)
+			start = time.time()
+            position_list = pool.map(self.loopPos,range(len(agent_list)))
+            #position_list = [self.schedule.agents[i].pos for i in range(len(agent_list))]
             close_points = closest_points(position_list, 2)
             end = time.time() 
             print(end-start) 
@@ -343,6 +345,10 @@ class Tube(Model):
 
         self.schedule.agents[agent_list[0]].ang = angle_1
         self.schedule.agents[agent_list[1]].ang = angle_0
+
+    def loopPos(self, i):
+
+        return self.schedule.agents[i].pos
 
     def step(self):
 
@@ -395,7 +401,7 @@ def kde2D(x, y , bandwidth, xbins, ybins, **kwargs):
     kde_skl = KernelDensity(bandwidth=bandwidth, algorithm='kd_tree', rtol=0)
     kde_skl.fit(xy_train)
 
-    # score_samples() returns the log-likelihood of the samples
+	# score_samples() returns the log-likelihood of the samples
     z = np.exp(kde_skl.score_samples(xy_sample))
 
     return xx, yy, np.reshape(z, xx.shape)
