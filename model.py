@@ -11,7 +11,7 @@ from mesa.time import RandomActivation
 from bacteria import Bacteria
 
 
-#if __name__ == '__main__':
+#if __name__ == 'model':
 import numpy as np
 import statsmodels.api as sm
 import pandas as pd
@@ -19,6 +19,8 @@ from sklearn.neighbors import KernelDensity
 import heapq
 from collections import Counter
 import time
+from joblib import parallel_backend
+import multiprocessing
 
 #set global variables for the tube model
 D_c = 1.e-10 #diffusion coefficient of the nutrients
@@ -117,6 +119,7 @@ class Tube(Model):
         """
         Create self.population agents, with random positions and starting headings.
         """
+        print(__name__)
         for i in range(self.population):
 
             #have the initial position start at the centre of the y axis
@@ -139,6 +142,7 @@ class Tube(Model):
             )
             self.space.place_agent(bacteria, pos)
             self.schedule.add(bacteria)
+
 
     def bacteriaReproduce(self):
         """
@@ -216,7 +220,6 @@ class Tube(Model):
 
         #calculate the bandwidth
         bw = scottsRule(x_list, y_list)
-        bw = np.mean(bw)
 
         #calculate the density kernel
         xx, yy, zz, = kde2D(x_list,y_list,bw, nx+1,ny+1)
@@ -323,7 +326,9 @@ class Tube(Model):
         #if there are multiple colliding agents just collide the two with the shortest Euclidean distance
         if len(agent_list) > 2:
 
-            position_list = [self.schedule.agents[i].pos for i in range(len(agent_list))]
+            pool = multiprocessing.Pool(4)
+            position_list = pool.map(self.loopPos,range(len(agent_list)))
+            #position_list = [self.schedule.agents[i].pos for i in range(len(agent_list))]
             close_points = closest_points(position_list, 2)
 
             #get the indexes of these points
@@ -337,6 +342,10 @@ class Tube(Model):
 
         self.schedule.agents[agent_list[0]].ang = angle_1
         self.schedule.agents[agent_list[1]].ang = angle_0
+
+    def loopPos(self, i):
+
+        return self.schedule.agents[i].pos
 
     def step(self):
 
@@ -369,12 +378,16 @@ def kde2D(x, y , bandwidth, xbins, ybins, **kwargs):
     xy_sample = np.vstack([yy.ravel(), xx.ravel()]).T
     xy_train = np.vstack([y, x]).T
 
-    #calculate the density kernel
-    kde_skl = KernelDensity(bandwidth=bandwidth, **kwargs)
-    kde_skl.fit(xy_train)
+    with parallel_backend('threading', n_jobs=1):
 
-    # score_samples() returns the log-likelihood of the samples
-    z = np.exp(kde_skl.score_samples(xy_sample))
+        #calculate the density kernel
+        kde_skl = KernelDensity(bandwidth=bandwidth, algorithm='kd_tree', rtol=1)
+        kde_skl.fit(xy_train)
+
+        # score_samples() returns the log-likelihood of the samples
+        z = np.exp(kde_skl.score_samples(xy_sample))
+
+
 
     return xx, yy, np.reshape(z, xx.shape)
 
@@ -382,7 +395,7 @@ def scottsRule(x, y):
     """Compute bandwidth using Scotts rule. Note that in two-dimensions Scotts rule is equivalent to silvermans rule"""
     n =  len(x)
     std = np.array((np.std(x),np.std(y)))
-    return n**(-1./6)*std
+    return n**(-1./6)
 
 
 
