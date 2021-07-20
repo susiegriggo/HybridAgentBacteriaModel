@@ -10,18 +10,13 @@ from mesa.space import ContinuousSpace
 from mesa.time import RandomActivation
 from bacteria import Bacteria
 
-
-#if __name__ == 'model':
 import numpy as np
 import statsmodels.api as sm
 import pandas as pd
 from sklearn.neighbors import KernelDensity
-import heapq
-from collections import Counter
 import time
-import multiprocessing
-
-
+from fastdist import fastdist
+from collections import Counter
 
 #set global variables for the tube model
 D_c = 1.e-10 #diffusion coefficient of the nutrients
@@ -45,9 +40,8 @@ class Tube(Model):
         height_=100,
         name = " ",
         pattern = "tumble",
-        beta_star = 10E-7,
+        beta_star = False,
         c_star = False,
-        n_jobs = 8
 
     ):
 
@@ -68,7 +62,6 @@ class Tube(Model):
         self.height = height_
         self.prefix =  str(name)+'_pop'+str(self.population)
         self.pattern = pattern
-        self.n_jobs = n_jobs #number of cpus to use for kde
         self.dx = 0.001 #size of grid increments
         self.dt = 0.01 #length of the timesteps in the model
         self.nx = int(width_/self.dx) #number of increments in x direction
@@ -102,7 +95,7 @@ class Tube(Model):
 
         #generate grid to solve the concentration over
         self.u0 = self.c_star * np.ones((self.nx+1, self.ny+1)) #starting concentration of bacteria
-        self.u = self.u0.copy() #current concentration of bacteria - updating through each timestep
+        self.u = self.u0.copy() #current concentration of bacteria
 
         #store the location of the band at each timepoint
         self.band_location = []  # intialise list to store the location of the band at each dt
@@ -116,15 +109,14 @@ class Tube(Model):
 
 
     def make_agents(self):
-
         """
         Create self.population agents, with random positions and starting headings.
         """
         for i in range(self.population):
 
             #have the initial position start at the centre of the y axis
-            x = self.width/2
-           # x = self.width/2 #uncomment to position bacteria in the centre of the modelling space
+            #x = self.width/1000
+            x = self.width/2 #uncomment to position bacteria in the centre of the modelling space
             y = self.height/2
 
             #x = self.width/2
@@ -183,30 +175,6 @@ class Tube(Model):
 
     def densityKernel(self, agent_positions):
         """
-        Use the Multivariate Gaussian density kernel to calculate the density of bacteria in the tube
-        Uses a multivariate kernel estimate. Estimates the bandwidth using Scotts rule.
-        """
-
-        #determine how many decimals to round to
-        r= round(-1 * np.log10(dx))
-
-        #generate a grid
-        X, Y = np.mgrid[0:width:(nx + 1) * 1j, 0:height:(ny + 1) * 1j]
-
-        #get the coordinates in the grid
-        positions = np.vstack([X.ravel(), Y.ravel()])
-        settings = sm.nonparametric.EstimatorSettings(efficient=True,n_jobs = 1)
-        dens = sm.nonparametric.KDEMultivariate(data = agent_positions, var_type = 'cc', defaults=settings)
-        bact_dens = dens.pdf(positions)
-
-        bact_dens = np.reshape(bact_dens.T, X.shape)
-        if np.isnan(np.min(bact_dens)) == True:
-            bact_dens = np.zeros((bact_dens.shape))
-
-        return bact_dens.T
-
-    def densityKernel2(self, agent_positions):
-        """
         Alternative to density kernel function above
         """
         #get a list of the x and y values
@@ -238,10 +206,9 @@ class Tube(Model):
         agent_positions = [all_agents[i].pos for i in range(len(all_agents))]
 
         #get the gaussian density kernel of the bacteria
-        #bacterial_density = self.densityKernel(agent_positions).T
-        bacterial_density = self.densityKernel2(agent_positions)
+        bacterial_density = self.densityKernel(agent_positions)
 
-
+        #solve the partial differential equation model using the fintie difference method
         self.u[1:-1, 1:-1] = self.u0[1:-1, 1:-1] + self.D_star * self.dt * ((self.u0[2:, 1:-1] - 2 * self.u0[1:-1, 1:-1] + self.u0[:-2, 1:-1]) / dx2 + (
                         self.u0[1:-1, 2:] - 2 * self.u0[1:-1, 1:-1] + self.u0[1:-1, :-2]) / dy2) - self.dt * self.beta_star *self.population*bacterial_density[1:-1, 1:-1]
 
@@ -293,96 +260,80 @@ class Tube(Model):
         If there is two cells with the same angle consider these the same cell
         """
 
-        all_agents = self.schedule.agents 
-        agent_positions = [all_agents[i].pos for i in range(len(all_agents))]
+        #get the positions of all agents
+        agent_positions = [agent.pos for agent in self.schedule.agents]
+        agent_positions = np.array(agent_positions)
 
         #round the list of positions using the radius
-        r = 4 #round to 4 decimals - consistent with 1 micron radius 
-        start = time.time()
+        r = 4 #round to 4 decimals - consistent with 1 micron radius
         agent_pos_rounded = [(round(position[0], r),round(position[1], r)) for position in agent_positions]
-    
-        #next - see if occur more than once then these bacteria must collide
+
+        #see how many collision points occur
         position_counter = Counter(agent_pos_rounded)
         counter_df = pd.DataFrame.from_dict(position_counter, orient='index').reset_index()
         colliders = counter_df[counter_df[0] > 1]
         collider_points = colliders['index'].values
 
-        #create pool for multiprocessing
-        pool = multiprocessing.Pool(8)
-
         #loop through the colliding points
         for point in collider_points:
-    
-            #get the index corresponding to the point
+
+            #get the indices corresponding to the point
             idx = [i for i, d in enumerate(agent_pos_rounded) if d == point]
 
             #if there are more than two agents involved in the collision just consider the closest two
             if len(idx) > 2:
-                start = time.time()
-                position_list = pool.map(self.loopPos, idx)
 
+                #get the positions of the colliding bacteria
+                position_list = [self.schedule.agents[i].pos for i in idx]
+                position_list = np.array(position_list)
 
-                # position_list = [self.schedule.agents[i].pos for i in range(len(agent_list))]
-                close_points = closest_points(position_list, 2)
-                end = time.time()
-                print(end - start)
-                # get the indexes of these points
-                shortest_pair = [position_list.index(close_points[0]), position_list.index(close_points[0])]
+                #get the 2 closest points out of these points
+                dist_mat = fastdist.matrix_pairwise_distance(position_list, fastdist.euclidean, "euclidean", return_matrix=True)
 
-                agent_list = shortest_pair
+                #get the index of the minimum
+                idx = np.argwhere(dist_mat == np.min(dist_mat))[0]
 
             # perform the collision by swapping the angles (simulate an incidence angle)
-            angle_0 = self.schedule.agents[agent_list[0]].ang
-            angle_1 = self.schedule.agents[agent_list[1]].ang
+            angle_0 = self.schedule.agents[idx[0]].ang
+            angle_1 = self.schedule.agents[idx[1]].ang
 
-            self.schedule.agents[agent_list[0]].ang = angle_1
-            self.schedule.agents[agent_list[1]].ang = angle_0
-
-        pool.close()
-        pool.join()
-
-    def loopPos(self, i):
-
-        return self.schedule.agents[i].pos
+            self.schedule.agents[idx[0]].ang = angle_1
+            self.schedule.agents[idx[1]].ang = angle_0
 
     def step(self):
 
         #perform a step
-        print('STEPPING') 
+        print('STEPPING')
         start = time.time()
         self.schedule.step()
         end = time.time()
-        print(end-start)
+        print(end - start)
 
-        #correct for neighbouring bacteria which have collided
-        #ignore the first tick as everything will collide
+        # correct for neighbouring bacteria which have collided
+        # ignore the first tick as everything will collide
         if self.ticks > 1:
-            print('CONCENTRATION') 
-            start = time.time() 
+            print('CONCENTRATION')
+            start = time.time()
             self.stepConcentration()
-            end = time.time() 
-            print(end-start)
-            print('NEIGHBOURS') 
-            start = time.time() 
+            end = time.time()
+            print(end - start)
+            print('NEIGHBOURS')
+            start = time.time()
             self.neighbourCollide()
             end = time.time()
-            print(end-start) 
+            print(end - start)
 
-        #let bacteria reproduce
-        print('REPRODUCING') 
+        # let bacteria reproduce
+        print('REPRODUCING')
         start = time.time()
         self.bacteriaReproduce()
-        end = time.time() 
-        print(end-start)
-    
+        end = time.time()
+        print(end - start)
+
         #update the number of ticks which have occured
         self.ticks = self.ticks + 1
-        if self.ticks % 10 == 0:
+        if self.ticks % 100 == 0:
             print('TIME ELAPSED: '+ str(self.ticks*self.dt)+ ' seconds', flush = True)
-
-def closest_points(list_of_tuples, n=2):
-    """Method to efficiently compute the two closest points in space"""
-    return heapq.nsmallest(n, list_of_tuples, lambda pnt:abs(pnt[0]))
 
 def kde2D(x, y , bandwidth, xbins, ybins, **kwargs):
 
@@ -406,6 +357,7 @@ def scottsRule(x, y):
     n =  len(x)
     std = np.array((np.std(x),np.std(y)))
     return np.mean(std)* n**(-1/6)
+
 
 
 
