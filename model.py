@@ -347,13 +347,14 @@ def kde2D(x, y , bandwidth, xbins, ybins, **kwargs):
     kde_skl = KernelDensity(bandwidth=bandwidth, algorithm='kd_tree', rtol=0)
     kde_skl.fit(xy_train)
 
-	# score_samples() returns the log-likelihood of the samples
+    # score_samples() returns the log-likelihood of the samples
     z = np.exp(kde_skl.score_samples(xy_sample))
 
     return xx, yy, np.reshape(z, xx.shape)
 
 def scottsRule(x, y):
     """Compute bandwidth using Scotts rule. Note that in two-dimensions Scotts rule is equivalent to silvermans rule"""
+    
     n =  len(x)
     std = np.array((np.std(x),np.std(y)))
     return np.mean(std)* n**(-1/6)
