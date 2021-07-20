@@ -19,8 +19,9 @@ from sklearn.neighbors import KernelDensity
 import heapq
 from collections import Counter
 import time
-from joblib import parallel_backend
 import multiprocessing
+
+
 
 #set global variables for the tube model
 D_c = 1.e-10 #diffusion coefficient of the nutrients
@@ -30,7 +31,7 @@ radius = 1*10E-4 #radius of bacteria in centimetres
 
 #scaling parameters
 tau = 1 #time scale
-L = 1 #lengh scaling
+L = 1 #lengh scalin
 
 class Tube(Model):
     """
@@ -119,7 +120,6 @@ class Tube(Model):
         """
         Create self.population agents, with random positions and starting headings.
         """
-        print(__name__)
         for i in range(self.population):
 
             #have the initial position start at the centre of the y axis
@@ -237,12 +237,10 @@ class Tube(Model):
         all_agents = self.schedule.agents
         agent_positions = [all_agents[i].pos for i in range(len(all_agents))]
 
-        #start = time.time()
         #get the gaussian density kernel of the bacteria
         #bacterial_density = self.densityKernel(agent_positions).T
         bacterial_density = self.densityKernel2(agent_positions)
-        #end = time.time()
-        #print(end - start)
+
 
         self.u[1:-1, 1:-1] = self.u0[1:-1, 1:-1] + self.D_star * self.dt * ((self.u0[2:, 1:-1] - 2 * self.u0[1:-1, 1:-1] + self.u0[:-2, 1:-1]) / dx2 + (
                         self.u0[1:-1, 2:] - 2 * self.u0[1:-1, 1:-1] + self.u0[1:-1, :-2]) / dy2) - self.dt * self.beta_star *self.population*bacterial_density[1:-1, 1:-1]
@@ -300,7 +298,7 @@ class Tube(Model):
 
         #round the list of positions using the radius
         r = 4 #round to 4 decimals - consistent with 1 micron radius 
-        start = time.time() 
+        start = time.time()
         agent_pos_rounded = [(round(position[0], r),round(position[1], r)) for position in agent_positions]
     
         #next - see if occur more than once then these bacteria must collide
@@ -308,43 +306,40 @@ class Tube(Model):
         counter_df = pd.DataFrame.from_dict(position_counter, orient='index').reset_index()
         colliders = counter_df[counter_df[0] > 1]
         collider_points = colliders['index'].values
-    
+
+        #create pool for multiprocessing
+        pool = multiprocessing.Pool(8)
+
         #loop through the colliding points
         for point in collider_points:
     
             #get the index corresponding to the point
             idx = [i for i, d in enumerate(agent_pos_rounded) if d == point]
 
-            #form a collision
-            self.getCollision(idx)
-        
+            #if there are more than two agents involved in the collision just consider the closest two
+            if len(idx) > 2:
+                start = time.time()
+                position_list = pool.map(self.loopPos, idx)
 
-    def getCollision(self, agent_list):
-        """
-        Generate a new angle for the bacteria from the orignal lognormal distribution.
-        Potential to change this function to relfect the actual behaviour
-        """
-        #if there are multiple colliding agents just collide the two with the shortest Euclidean distance
-        if len(agent_list) > 2:
 
-            pool = multiprocessing.Pool(4)
-			start = time.time()
-            position_list = pool.map(self.loopPos,range(len(agent_list)))
-            #position_list = [self.schedule.agents[i].pos for i in range(len(agent_list))]
-            close_points = closest_points(position_list, 2)
-            end = time.time() 
-            print(end-start) 
-            #get the indexes of these points
-            shortest_pair = [position_list.index(close_points[0]), position_list.index(close_points[0])]
+                # position_list = [self.schedule.agents[i].pos for i in range(len(agent_list))]
+                close_points = closest_points(position_list, 2)
+                end = time.time()
+                print(end - start)
+                # get the indexes of these points
+                shortest_pair = [position_list.index(close_points[0]), position_list.index(close_points[0])]
 
-            agent_list = shortest_pair
+                agent_list = shortest_pair
 
-        #perform the collision by swapping the angles (simulate an incidence angle)
-        angle_0 = self.schedule.agents[agent_list[0]].ang
-        angle_1 = self.schedule.agents[agent_list[1]].ang
+            # perform the collision by swapping the angles (simulate an incidence angle)
+            angle_0 = self.schedule.agents[agent_list[0]].ang
+            angle_1 = self.schedule.agents[agent_list[1]].ang
 
-        self.schedule.agents[agent_list[0]].ang = angle_1
-        self.schedule.agents[agent_list[1]].ang = angle_0
+            self.schedule.agents[agent_list[0]].ang = angle_1
+            self.schedule.agents[agent_list[1]].ang = angle_0
+
+        pool.close()
+        pool.join()
 
     def loopPos(self, i):
 
