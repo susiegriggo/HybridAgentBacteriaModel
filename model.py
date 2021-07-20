@@ -326,9 +326,10 @@ class Tube(Model):
         """
         #if there are multiple colliding agents just collide the two with the shortest Euclidean distance
         if len(agent_list) > 2:
-
-            pool = multiprocessing.Pool(4)
-			start = time.time()
+            n_jobs = multiprocessing.cpu_count()
+            pool = multiprocessing.Pool(n_jobs)
+            start = time.time()
+            print('position list')  
             position_list = pool.map(self.loopPos,range(len(agent_list)))
             #position_list = [self.schedule.agents[i].pos for i in range(len(agent_list))]
             close_points = closest_points(position_list, 2)
@@ -401,7 +402,7 @@ def kde2D(x, y , bandwidth, xbins, ybins, **kwargs):
     kde_skl = KernelDensity(bandwidth=bandwidth, algorithm='kd_tree', rtol=0)
     kde_skl.fit(xy_train)
 
-	# score_samples() returns the log-likelihood of the samples
+    # score_samples() returns the log-likelihood of the samples
     z = np.exp(kde_skl.score_samples(xy_sample))
 
     return xx, yy, np.reshape(z, xx.shape)
