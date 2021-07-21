@@ -259,76 +259,72 @@ class Tube(Model):
         Check if neighbours  colliding using a grid. If neighbours collide perform an inelastic collision.
         If there is two cells with the same angle consider these the same cell
         """
-
+        
         #get the positions of all agents
         agent_positions = [agent.pos for agent in self.schedule.agents]
         agent_positions = np.array(agent_positions)
 
         #round the list of positions using the radius
         r = 4 #round to 4 decimals - consistent with 1 micron radius
-        agent_pos_rounded = [(round(position[0], r),round(position[1], r)) for position in agent_positions]
-
+        agent_pos_rounded = [(round(position[0], r),round(position[1], r)) for position in agent_positions] 
+    
         #see how many collision points occur
         position_counter = Counter(agent_pos_rounded)
         counter_df = pd.DataFrame.from_dict(position_counter, orient='index').reset_index()
         colliders = counter_df[counter_df[0] > 1]
-        collider_points = colliders['index'].values
+        collider_points = colliders['index'].values    
 
         #loop through the colliding points
         for point in collider_points:
-
+            
             #get the indices corresponding to the point
             idx = [i for i, d in enumerate(agent_pos_rounded) if d == point]
 
-            #if there are more than two agents involved in the collision just consider the closest two
-            if len(idx) > 2:
+            if len(idx)<6:
+     
+                    #get the indices corresponding to the point
+                    idx = [i for i, d in enumerate(agent_pos_rounded) if d == point]
 
-                #get the positions of the colliding bacteria
-                position_list = [self.schedule.agents[i].pos for i in idx]
-                position_list = np.array(position_list)
+                    #if there are more than two agents involved in the collision just consider the closest two
+                    if 2<len(idx):
+                         
+                        #get the positions of the colliding bacteria
+                        position_list = [self.schedule.agents[i].pos for i in idx]
+                        position_list = np.array(position_list)
 
-                #get the 2 closest points out of these points
-                dist_mat = fastdist.matrix_pairwise_distance(position_list, fastdist.euclidean, "euclidean", return_matrix=True)
+                        #get the 2 closest points out of these points
+                        dist_mat = fastdist.matrix_pairwise_distance(position_list, fastdist.euclidean, "euclidean", return_matrix=True)
 
-                #get the index of the minimum
-                idx = np.argwhere(dist_mat == np.min(dist_mat))[0]
+                        #get the index of the minimum
+                        idx = np.argwhere(dist_mat == np.min(dist_mat))[0]
 
-            # perform the collision by swapping the angles (simulate an incidence angle)
-            angle_0 = self.schedule.agents[idx[0]].ang
-            angle_1 = self.schedule.agents[idx[1]].ang
+                    #perform the collision by swapping the angles (simulate an incidence angle)
+                    angle_0 = self.schedule.agents[idx[0]].ang
+                    angle_1 = self.schedule.agents[idx[1]].ang
 
-            self.schedule.agents[idx[0]].ang = angle_1
-            self.schedule.agents[idx[1]].ang = angle_0
+                    self.schedule.agents[idx[0]].ang = angle_1
+                    self.schedule.agents[idx[1]].ang = angle_0
+
+			#if the collision contains more cells then generate random angles  
+            else: 
+				#randomly choose a new angle for all agnents involved in the collision 
+                for agent  in self.schedule.agents: 
+                    agent.ang = (agent.ang + np.random.uniform(0,360,1)) % 360
 
     def step(self):
 
-        #perform a step
-        print('STEPPING')
-        start = time.time()
+        #step the agent-based model 
         self.schedule.step()
-        end = time.time()
-        print(end - start)
 
-        # correct for neighbouring bacteria which have collided
-        # ignore the first tick as everything will collide
+        #ignore the first tick 
         if self.ticks > 1:
-            print('CONCENTRATION')
-            start = time.time()
+			#evalute the concentration field 	
             self.stepConcentration()
-            end = time.time()
-            print(end - start)
-            print('NEIGHBOURS')
-            start = time.time()
-            self.neighbourCollide()
-            end = time.time()
-            print(end - start)
+            #correct for colliding cells 
+			self.neighbourCollide()
 
-        # let bacteria reproduce
-        print('REPRODUCING')
-        start = time.time()
-        self.bacteriaReproduce()
-        end = time.time()
-        print(end - start)
+        #update bacterial reproduction 
+		self.bacteriaReproduce()
 
         #update the number of ticks which have occured
         self.ticks = self.ticks + 1
@@ -357,16 +353,5 @@ def scottsRule(x, y):
     
     n =  len(x)
     std = np.array((np.std(x),np.std(y)))
-    return np.mean(std)* n**(-1/6)
-
-
-
-
-
-
-
-
-
-
-
-
+    
+    return np.mean(std)*n**(-1/6)
