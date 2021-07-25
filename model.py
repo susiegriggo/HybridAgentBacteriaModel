@@ -42,7 +42,8 @@ class Tube(Model):
         pattern = "tumble",
         beta_star = False,
         c_star = False,
-
+        dt = 0.01, 
+        dx_ = 0.001,
     ):
 
         """
@@ -62,8 +63,8 @@ class Tube(Model):
         self.height = height_
         self.prefix =  str(name)+'_pop'+str(self.population)
         self.pattern = pattern
-        self.dx = 0.001 #size of grid increments
-        self.dt = 0.01 #length of the timesteps in the model
+        self.dx = dx_  #size of grid increments
+        self.dt = dt  #length of the timesteps in the model
         self.nx = int(width_/self.dx) #number of increments in x direction
         self.ny = int(height_/self.dx) #number of increments in y direction
         self.ticks = 1 #count the number of ticks which have elapsed
@@ -112,16 +113,25 @@ class Tube(Model):
         """
         Create self.population agents, with random positions and starting headings.
         """
+        
+        #determine the position for the bacteria to be added to the modelling space 
+        #if the space is square innoculate in the centre otherwise innoculate at the edge
+        x = 0
+        if self.width == self.height:
+            x = self.width/2
+        else:
+            x = self.width/1000
+
+        #innoculate in the centre of the y direction
+        y = self.height/2
+
+        #set this x and y as the position
+        pos = np.array((x, y))
+ 
+        #loop to add bateria at to the space 
         for i in range(self.population):
-
-            #have the initial position start at the centre of the y axis
-            #x = self.width/1000
-            x = self.width/2 #uncomment to position bacteria in the centre of the modelling space
-            y = self.height/2
-
-            #x = self.width/2
-            pos = np.array((x, y))
-
+            
+            #create a baterial agent 
             bacteria = Bacteria(
                 i,
                 self,
@@ -132,9 +142,10 @@ class Tube(Model):
                 self.prefix,
                 self.pattern,
             )
+
+            #add this bacterial agent to the modelling space 
             self.space.place_agent(bacteria, pos)
             self.schedule.add(bacteria)
-
 
     def bacteriaReproduce(self):
         """
@@ -149,15 +160,18 @@ class Tube(Model):
         #identify which of these are less than dt
         grew = np.where(agent_growthstate < self.dt)
 
+        #loop through the bacteria which are reproducing
         if len(grew[0]) > 0:
 
             for i in range(len(grew[1])):
 
                 #get the position of the new bacteria
                 pos = all_agents[i].pos
-
+                
+                #adjust the population counter 
                 self.population = self.population + 1
-
+                
+                #create a new bacteria agent 
                 bacteria = Bacteria(
                     self.population+1,
                     self,
@@ -167,16 +181,18 @@ class Tube(Model):
                     True,
                     self.prefix,
                     self.pattern,
-                    2.41E-3,
                 )
+                
+                #add this agent to the modelling space 
                 self.space.place_agent(bacteria, pos)
                 self.schedule.add(bacteria)
 
 
     def densityKernel(self, agent_positions):
         """
-        Alternative to density kernel function above
+        Use a multivariate density kernel to approximate the concentration of bacteria at each grid point 
         """
+
         #get a list of the x and y values
         x_list = [position[0] for position in agent_positions]
         y_list = [position[1] for position in agent_positions]
@@ -199,6 +215,8 @@ class Tube(Model):
         Update the concentration grid of the model depending on the current location of agents.
         Uses finite difference equations of Ficks law from Franz et al.
         """
+
+        #calculate components needed for the discretisation 
         dx2, dy2 = self.dx * self.dx, self.dx * self.dx
 
         #get the positions of all agents
@@ -214,24 +232,25 @@ class Tube(Model):
 
         # set such that the concentration cannot be lowered below zero
         self.u[self.u < 0] = 0
-        # incorporate the bacteria into this using vectorisation
-        self.u0 = self.u.copy()
 
-        dens_df = pd.DataFrame(bacterial_density)
+        #replcae the stored conccentration field with the newly generate concnetration field 
+        self.u0 = self.u.copy()
 
         #save updated versions of the density and concentration periodically
         if self.ticks % 100 == 0: #save every 100 ticks (i.e every 10 seconds)
-            concfield_name = str(self.prefix)+'_concentration_field_'+str(self.ticks) + "_ticks.csv"
-            densfield_name = str(self.prefix)+'_density_field_' +str(self.ticks) + "_ticks.csv"
+            concfield_name = str(self.prefix)+'_concentration_field_'+str(self.pattern)+'_pattern_'+'_dt'+str(self.dt)+'_'+str(self.ticks) + "_ticks.csv"
+            densfield_name = str(self.prefix)+'_density_field_' +str(self.pattern)+'_pattern_'+'_dt'+str(self.dt)+'_'+str(self.ticks) + "_ticks.csv"
 
+            #save the concentration field to a file 
             u_df = pd.DataFrame(self.u)
-            conc_file = str(self.prefix)+'_concentration_field.csv'
-            u_df.to_csv(conc_file, index = False)
             u_df.to_csv(concfield_name, index = False)
+            
+            #save the density field to a file 
+            dens_df = pd.DataFrame(bacterial_density)
             dens_df.to_csv(densfield_name, index = False)
 
         #update band location with the current location of the chemotaxis band
-        self.detectBand(dens_df)
+        #self.detectBand(dens_df)
         #save the band density
         #if self.ticks % 100 == 0: #save every 100 ticks (i.e every 1 second)
         #   band_name = str(self.name) + '_band_location_'+str(self.ticks)+"_ticks.csv"
@@ -242,6 +261,8 @@ class Tube(Model):
         """
         Detect the band in the tube by evaluating the mean bacterial density across each row
         """
+
+        #get the mean in each column 
         dens_df = dens_df.T
         col_means = dens_df.values.mean(axis=0)
 
@@ -271,6 +292,8 @@ class Tube(Model):
         #see how many collision points occur
         position_counter = Counter(agent_pos_rounded)
         counter_df = pd.DataFrame.from_dict(position_counter, orient='index').reset_index()
+
+        #get the points where each of these collisions occur 
         colliders = counter_df[counter_df[0] > 1]
         collider_points = colliders['index'].values    
 
@@ -279,9 +302,10 @@ class Tube(Model):
             
             #get the indices corresponding to the point
             idx = [i for i, d in enumerate(agent_pos_rounded) if d == point]
-
+            
+            #if the collision is only between a few cells determine which two cells will collide first 
             if len(idx)<6:
-     
+    
                     #get the indices corresponding to the point
                     idx = [i for i, d in enumerate(agent_pos_rounded) if d == point]
 
@@ -305,26 +329,56 @@ class Tube(Model):
                     self.schedule.agents[idx[0]].ang = angle_1
                     self.schedule.agents[idx[1]].ang = angle_0
 
-			#if the collision contains more cells then generate random angles  
-            else: 
-				#randomly choose a new angle for all agnents involved in the collision 
-                for agent  in self.schedule.agents: 
-                    agent.ang = (agent.ang + np.random.uniform(0,360,1)) % 360
+            #if the collision contains more cells then generate random angles  
+            else:
+                
+                angles = np.random.uniform(0,360,len(self.schedule.agents))
+                map(mapAngle, self.schedule.agents, angles)  
+                """ 
 
+                #loop through the agents involved in the large collision 
+                for agent  in self.schedule.agents: 
+                
+                    #generate a new angle 
+                    agent.ang = (agent.ang + np.random.uniform(0,360,1)) % 360
+                """
     def step(self):
+        """
+        Combine methods to do one step of the model
+        """
 
         #step the agent-based model 
+        print('STEP') 
+        start = time.time() 
         self.schedule.step()
+        end = time.time() 
+        print(end-start)
 
         #ignore the first tick 
         if self.ticks > 1:
-			#evalute the concentration field 	
+            print('CONCENTRATION') 
+            start = time.time() 
+            #evalute the concentration field    
             self.stepConcentration()
-            #correct for colliding cells 
-			self.neighbourCollide()
+            end = time.time()
+            print(end-start)
 
-        #update bacterial reproduction 
-		self.bacteriaReproduce()
+
+            #correct for colliding cells 
+            print('NEIGHBOURS') 
+            start = time.time() 
+            self.neighbourCollide()
+            end = time.time()
+            print(end-start)
+
+
+        #update bacterial reproduction
+        print('REPRODUCE') 
+        start = time.time()  
+        self.bacteriaReproduce()
+        end = time.time()
+        print(end-start)
+
 
         #update the number of ticks which have occured
         self.ticks = self.ticks + 1
@@ -332,15 +386,19 @@ class Tube(Model):
             print('TIME ELAPSED: '+ str(self.ticks*self.dt)+ ' seconds', flush = True)
 
 def kde2D(x, y , bandwidth, xbins, ybins, **kwargs):
+    """ 
+    Calculate the Gausian density kernel using the current location of the bacterial cells 
+    """ 
 
     #create a grid of the agent locations
     xx, yy = np.mgrid[0:width:xbins*1j, 0:height:ybins*1j]
-
     xy_sample = np.vstack([yy.ravel(), xx.ravel()]).T
+
+    #add the posiitions of bacteria to the grid 
     xy_train = np.vstack([y, x]).T
 
     #calculate the density kernel
-    kde_skl = KernelDensity(bandwidth=bandwidth, algorithm='kd_tree', rtol=0)
+    kde_skl = KernelDensity(bandwidth=bandwidth, algorithm='kd_tree', rtol=0.01)
     kde_skl.fit(xy_train)
 
     # score_samples() returns the log-likelihood of the samples
@@ -349,9 +407,17 @@ def kde2D(x, y , bandwidth, xbins, ybins, **kwargs):
     return xx, yy, np.reshape(z, xx.shape)
 
 def scottsRule(x, y):
-    """Compute bandwidth using Scotts rule. Note that in two-dimensions Scotts rule is equivalent to silvermans rule"""
+    """
+    Compute bandwidth using Scotts rule. Note that in two-dimensions Scotts rule is equivalent to silvermans rule
+    """
     
+    #get the number of points to be considered for the kernel 
     n =  len(x)
+
+    #calculate the standard deviation 
     std = np.array((np.std(x),np.std(y)))
     
     return np.mean(std)*n**(-1/6)
+
+def mapAngle(agent, angle):
+    agent.ang = (self.ang + angle) % 360
