@@ -43,7 +43,7 @@ class Tube(Model):
         beta_star = False,
         c_star = False,
         dt = 0.01, 
-        dx_ = 0.001,
+        dx_ = 0.1,
     ):
 
         """
@@ -70,6 +70,9 @@ class Tube(Model):
         self.ticks = 1 #count the number of ticks which have elapsed
         self.schedule = RandomActivation(self)
         self.space = ContinuousSpace(width_, height_, False)
+        
+        #set the innoculation point
+        self.innoculate = innoculationPoint(self.width, self.height)
 
         #calculate the values for dimensionless parameters
         self.p_inf = self.population/(self.width*self.height) #starting density of bacteria
@@ -90,6 +93,9 @@ class Tube(Model):
         #update the prefix with these terms
         self.prefix = self.prefix + '_betastar'+str(self.beta_star)+'_cstar'+str(self.c_star)
 
+        #generate a list to store the chemotactic motility coefficient 
+        self.cmc_list = [] 
+ 
         #create agents
         self.make_agents()
         self.running = True
@@ -97,9 +103,6 @@ class Tube(Model):
         #generate grid to solve the concentration over
         self.u0 = self.c_star * np.ones((self.nx+1, self.ny+1)) #starting concentration of bacteria
         self.u = self.u0.copy() #current concentration of bacteria
-
-        #store the location of the band at each timepoint
-        self.band_location = []  # intialise list to store the location of the band at each dt
 
         global dx, width, height, nx, ny
         dx = self.dx
@@ -113,20 +116,6 @@ class Tube(Model):
         """
         Create self.population agents, with random positions and starting headings.
         """
-        
-        #determine the position for the bacteria to be added to the modelling space 
-        #if the space is square innoculate in the centre otherwise innoculate at the edge
-        x = 0
-        if self.width == self.height:
-            x = self.width/2
-        else:
-            x = self.width/1000
-
-        #innoculate in the centre of the y direction
-        y = self.height/2
-
-        #set this x and y as the position
-        pos = np.array((x, y))
  
         #loop to add bateria at to the space 
         for i in range(self.population):
@@ -135,7 +124,7 @@ class Tube(Model):
             bacteria = Bacteria(
                 i,
                 self,
-                pos,
+                self.innoculate,
                 self.width,
                 self.height,
                 False,
@@ -144,7 +133,7 @@ class Tube(Model):
             )
 
             #add this bacterial agent to the modelling space 
-            self.space.place_agent(bacteria, pos)
+            self.space.place_agent(bacteria, self.innoculate)
             self.schedule.add(bacteria)
 
     def bacteriaReproduce(self):
@@ -249,32 +238,6 @@ class Tube(Model):
             dens_df = pd.DataFrame(bacterial_density)
             dens_df.to_csv(densfield_name, index = False)
 
-        #update band location with the current location of the chemotaxis band
-        #self.detectBand(dens_df)
-        #save the band density
-        #if self.ticks % 100 == 0: #save every 100 ticks (i.e every 1 second)
-        #   band_name = str(self.name) + '_band_location_'+str(self.ticks)+"_ticks.csv"
-        #   band_df = pd.DataFrame({'time': [self.dt*i for i in range(0,self.ticks)], "distance (cm)": self.band_location})
-        #   band_df.to_csv(band_name, index = False)
-
-    def detectBand(self, dens_df):
-        """
-        Detect the band in the tube by evaluating the mean bacterial density across each row
-        """
-
-        #get the mean in each column 
-        dens_df = dens_df.T
-        col_means = dens_df.values.mean(axis=0)
-
-        #get the column with the maximum density
-        max_dens_dx = np.where(col_means == np.amax(col_means))
-
-        #get the location relative to the size of the tube
-        max_dens_loc = max_dens_dx[0][0] * self.dx
-
-        #update the list of band locations
-        self.band_location.append(max_dens_loc)
-
     def neighbourCollide(self):
         """
         Check if neighbours  colliding using a grid. If neighbours collide perform an inelastic collision.
@@ -296,7 +259,7 @@ class Tube(Model):
         #get the points where each of these collisions occur 
         colliders = counter_df[counter_df[0] > 1]
         collider_points = colliders['index'].values    
-
+       
         #loop through the colliding points
         for point in collider_points:
             
@@ -334,20 +297,108 @@ class Tube(Model):
                 
                 angles = np.random.uniform(0,360,len(self.schedule.agents))
                 map(mapAngle, self.schedule.agents, angles)  
-                """ 
 
-                #loop through the agents involved in the large collision 
-                for agent  in self.schedule.agents: 
-                
-                    #generate a new angle 
-                    agent.ang = (agent.ang + np.random.uniform(0,360,1)) % 360
-                """
+            # perform the collision by swapping the angles (simulate an incidence angle)
+            angle_0 = self.schedule.agents[agent_list[0]].ang
+            angle_1 = self.schedule.agents[agent_list[1]].ang
+
+            self.schedule.agents[agent_list[0]].ang = angle_1
+            self.schedule.agents[agent_list[1]].ang = angle_0
+
+    def cmcUpdate(self): 
+        """
+        Update cmc_list the current chemotactic motility coefficient
+        """ 
+
+        #get the current cmc 
+        this_cmc = self.cmc() 
+
+        #update the cmc_list 
+        self.cmc_list = self.cmc_list.appent(this_cmc)
+
+        #every 100 ticks save the cmc data to a dataframe 
+        if self.ticks % 100 == 0: 
+            
+            #generate the corresponding time labels in seconds 
+            df_labels = [i*self.dt for i in range(self.ticks+1)]
+
+            #assemble into a dataframe 
+            cmc_df = pd.DataFrame({'time (seconds)':df_labels, 'CMC': self.cmc_list})
+
+            #get the prefix to save the cmc_df 
+            cmc_prefix = str(self.prefix)+'cmc_df_'+str(self.pattern)+'_pattern_'+'_dt'+str(self..dt)+'_'+str(self.ticks)+'_ticks.csv'
+            
+            #save the cmc_df 
+            cmc_df.to_csv(cmc_prefix, index = False )
+
+    def cmc(self):
+        """
+        Calculate the Chemotactic Motility Coefficient for the current agent positions
+        Just consider the x position (1-d space)
+        """
+
+        #get the list of agent positions
+        agent_positions = [agent.pos[0] for agent in self.schedule.agents]
+        agent_positions = np.array(agent_positions)
+
+        #determine the current mean location in the x direction
+        mean_pos = np.mean(agent_positions)
+
+        #get the x coordinate of the innoculation point
+        inn_x = self.innoculate[0]
+
+        #calculate the cmc
+        cmc = (mean_pos - inn_x)/(0.5*self.width)
+
+        return cmc
+
+
+    def probDensUpdate(self): 
+        """
+        Generate a dataframe of the probability density and save to a csv file 
+        """
+
+        #get the probability distribution 
+        this_probdens = self.probDens()
+
+        #get the prefix to save the density dataframe 
+        probdens_prefix = str(self.prefix)+'probdens_df_'+str(self.pattern)+'_pattern_'+'_dt'+str(self..dt)+'_'+str(self.ticks)+'_ticks.csv'
+
+        #save the dataframe 
+        this_probdens.to_csv(probdens_prefix, index = False)
+
+    def probDens(self):
+        """
+        Calculate the normalised density of bacteria for the current time point.
+        Alternative to a heatmap but only considered in one-dimension. 
+        Could be normalised for figures 
+        """
+
+        #get the x coordinate of all agents
+        agent_positions = [agent.pos[0] for agent in self.schedule.agents]
+        agent_positions = np.array(agent_positions) 
+         
+        #generate the count of bacteria in each grid point along the x axis 
+        hist_values = np.histogram(agent_positions, bins = self.nx+1)[0] # TOOD check this 
+        
+        #change these values to the density 
+        density_values = hist_values/(self.height*self.dx)
+
+        #get the labels corresponding to these density values 
+        density_labels = [n*self.dx for n in range(self.nx+1)]
+        density_labels = np.array(density_labels)
+       
+        #create a dataframe 
+        dist_df = pd.DataFrame({'x position': density_labels, 'density':density_values})
+        
+        return dist_df      
+    
     def step(self):
         """
         Combine methods to do one step of the model
         """
 
-        #step the agent-based model 
+        #perform a step 
         print('STEP') 
         start = time.time() 
         self.schedule.step()
@@ -367,7 +418,7 @@ class Tube(Model):
             #correct for colliding cells 
             print('NEIGHBOURS') 
             start = time.time() 
-            self.neighbourCollide()
+            #self.neighbourCollide()
             end = time.time()
             print(end-start)
 
@@ -379,11 +430,37 @@ class Tube(Model):
         end = time.time()
         print(end-start)
 
+        #add the cmc to a list 
+        self.cmcUpdate()
+
+        #if the model is a tube save the density every 100 ticks 
+        if self.width > self.height: 
+            if self.ticks % 100 == 0:  
+                self.probDensUpdate() 
 
         #update the number of ticks which have occured
         self.ticks = self.ticks + 1
         if self.ticks % 100 == 0:
             print('TIME ELAPSED: '+ str(self.ticks*self.dt)+ ' seconds', flush = True)
+
+def innoculationPoint(width, height): 
+    """
+    Determine the innoulation point of the simulation based on the width and height parsed
+    """ 
+    
+    #if the space is square innoculate in the centre
+    x = 0
+    if width == height:
+        x = width/2
+
+    #if rectangular modelling space innoculate the left edge 
+    else:
+        x = width/1000
+
+    #innoculate in the centre of the y direction
+    y = height/2
+    
+    return np.array((x,y))
 
 def kde2D(x, y , bandwidth, xbins, ybins, **kwargs):
     """ 
@@ -420,4 +497,10 @@ def scottsRule(x, y):
     return np.mean(std)*n**(-1/6)
 
 def mapAngle(agent, angle):
+    """
+    Helper function to quickly generate new angles for a set of agents
+    """
+
     agent.ang = (self.ang + angle) % 360
+    
+
