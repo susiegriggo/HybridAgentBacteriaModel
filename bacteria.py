@@ -6,6 +6,7 @@ import numpy as np
 import random
 import pandas as pd
 from mesa import Agent
+import time 
 
 #variables to calculate the rotational diffusion coefficient 
 k = 1.3807E-16 #boltzmans constant 
@@ -34,7 +35,7 @@ velocity_std = 6E-4
 mean_run = 1 
 
 #wall effects
-arch_collision = 0 #manually set the probability of an arch collision 
+arch_collision = 1  #manually set the probability of an arch collision 
 tangent_collision = 1 - arch_collision #probability of a tangential deflection collision
 
 class Bacteria(Agent):
@@ -278,7 +279,7 @@ class Bacteria(Agent):
         """
 
         # get the increase in each direction per unit time
-        conc_dx = model_width / self.model.nx
+        conc_dx = model_width / self.model.nx 
         conc_dy = model_height / self.model.ny
 
         # find the number of decimal places to round the position to
@@ -481,10 +482,10 @@ class Bacteria(Agent):
         y_new = self.pos[1] + self.velocity*self.status*np.sin(np.deg2rad(self.ang))*self.dt#+np.sqrt(2*D_rot*self.dt)*self.W_y
         new_pos = [x_new[0], y_new[0]]
 
-        #adjust the position for a collision
+        #adjust the position for a collisioni 
         new_pos = self.checkCollision(new_pos)
         self.pos = new_pos
-        self.model.space.move_agent(self, self.pos)
+        self.model.space.move_agent(self, self.pos) 
 
         #add this timestep to the timer
         self.timer = self.timer + self.dt

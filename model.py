@@ -43,7 +43,7 @@ class Tube(Model):
         beta_star = False,
         c_star = False,
         dt = 0.01, 
-        dx_ = 0.1,
+        dx_ = False, 
     ):
 
         """
@@ -63,8 +63,17 @@ class Tube(Model):
         self.height = height_
         self.prefix =  str(name)+'_pop'+str(self.population)
         self.pattern = pattern
-        self.dx = dx_  #size of grid increments
+
+        #set the size of the grid increments 
+        if not dx_:
+            self.dx = 0.0001
+        else: 
+            self.dx = dx_ 
+
         self.dt = dt  #length of the timesteps in the model
+        print('dx '+str(self.dx))
+        print('width '+str(width_))
+        print('nx '+str(width_/self.dx)) 
         self.nx = int(width_/self.dx) #number of increments in x direction
         self.ny = int(height_/self.dx) #number of increments in y direction
         self.ticks = 1 #count the number of ticks which have elapsed
@@ -104,6 +113,9 @@ class Tube(Model):
         self.u0 = self.c_star * np.ones((self.nx+1, self.ny+1)) #starting concentration of bacteria
         self.u = self.u0.copy() #current concentration of bacteria
 
+        #set the number of ticks to save files for the model 
+        self.update = 20  
+
         global dx, width, height, nx, ny
         dx = self.dx
         nx = self.nx
@@ -130,6 +142,11 @@ class Tube(Model):
                 False,
                 self.prefix,
                 self.pattern,
+                False,
+                False,
+                False, 
+                False,
+                self.dt 
             )
 
             #add this bacterial agent to the modelling space 
@@ -170,6 +187,11 @@ class Tube(Model):
                     True,
                     self.prefix,
                     self.pattern,
+                    False,
+                    False,
+                    False,
+                    False,
+                    self.dt
                 )
                 
                 #add this agent to the modelling space 
@@ -226,7 +248,7 @@ class Tube(Model):
         self.u0 = self.u.copy()
 
         #save updated versions of the density and concentration periodically
-        if self.ticks % 100 == 0: #save every 100 ticks (i.e every 10 seconds)
+        if self.ticks % self.update  == 0: #save every 100 ticks (i.e every 10 seconds)
             concfield_name = str(self.prefix)+'_concentration_field_'+str(self.pattern)+'_pattern_'+'_dt'+str(self.dt)+'_'+str(self.ticks) + "_ticks.csv"
             densfield_name = str(self.prefix)+'_density_field_' +str(self.pattern)+'_pattern_'+'_dt'+str(self.dt)+'_'+str(self.ticks) + "_ticks.csv"
 
@@ -277,10 +299,11 @@ class Tube(Model):
                          
                         #get the positions of the colliding bacteria
                         position_list = [self.schedule.agents[i].pos for i in idx]
-                        position_list = np.array(position_list)
+                        position_list = np.array(position_list).astype(float)
 
                         #get the 2 closest points out of these points
                         dist_mat = fastdist.matrix_pairwise_distance(position_list, fastdist.euclidean, "euclidean", return_matrix=True)
+                        #print(position_list)
 
                         #get the index of the minimum
                         idx = np.argwhere(dist_mat == np.min(dist_mat))[0]
@@ -298,13 +321,6 @@ class Tube(Model):
                 angles = np.random.uniform(0,360,len(self.schedule.agents))
                 map(mapAngle, self.schedule.agents, angles)  
 
-            # perform the collision by swapping the angles (simulate an incidence angle)
-            angle_0 = self.schedule.agents[agent_list[0]].ang
-            angle_1 = self.schedule.agents[agent_list[1]].ang
-
-            self.schedule.agents[agent_list[0]].ang = angle_1
-            self.schedule.agents[agent_list[1]].ang = angle_0
-
     def cmcUpdate(self): 
         """
         Update cmc_list the current chemotactic motility coefficient
@@ -314,19 +330,19 @@ class Tube(Model):
         this_cmc = self.cmc() 
 
         #update the cmc_list 
-        self.cmc_list = self.cmc_list.appent(this_cmc)
+        self.cmc_list.append(this_cmc)
 
         #every 100 ticks save the cmc data to a dataframe 
-        if self.ticks % 100 == 0: 
+        if self.ticks % self.update  == 0: 
             
             #generate the corresponding time labels in seconds 
-            df_labels = [i*self.dt for i in range(self.ticks+1)]
+            df_labels = [i*self.dt for i in range(self.ticks)] 
 
             #assemble into a dataframe 
             cmc_df = pd.DataFrame({'time (seconds)':df_labels, 'CMC': self.cmc_list})
 
             #get the prefix to save the cmc_df 
-            cmc_prefix = str(self.prefix)+'cmc_df_'+str(self.pattern)+'_pattern_'+'_dt'+str(self..dt)+'_'+str(self.ticks)+'_ticks.csv'
+            cmc_prefix = str(self.prefix)+'_cmc_df_'+str(self.pattern)+'_pattern_'+'_dt'+str(self.dt)+'_'+str(self.ticks)+'_ticks.csv'
             
             #save the cmc_df 
             cmc_df.to_csv(cmc_prefix, index = False )
@@ -362,7 +378,7 @@ class Tube(Model):
         this_probdens = self.probDens()
 
         #get the prefix to save the density dataframe 
-        probdens_prefix = str(self.prefix)+'probdens_df_'+str(self.pattern)+'_pattern_'+'_dt'+str(self..dt)+'_'+str(self.ticks)+'_ticks.csv'
+        probdens_prefix = str(self.prefix)+'_probdens_df_'+str(self.pattern)+'_pattern_'+'_dt'+str(self.dt)+'_'+str(self.ticks)+'_ticks.csv'
 
         #save the dataframe 
         this_probdens.to_csv(probdens_prefix, index = False)
@@ -414,11 +430,10 @@ class Tube(Model):
             end = time.time()
             print(end-start)
 
-
             #correct for colliding cells 
             print('NEIGHBOURS') 
             start = time.time() 
-            #self.neighbourCollide()
+            self.neighbourCollide()
             end = time.time()
             print(end-start)
 
@@ -431,16 +446,20 @@ class Tube(Model):
         print(end-start)
 
         #add the cmc to a list 
+        print('CMC') 
+        start = time.time()  
         self.cmcUpdate()
+        end= time.time()       
+        print(end-start) 
 
         #if the model is a tube save the density every 100 ticks 
         if self.width > self.height: 
-            if self.ticks % 100 == 0:  
+            if self.ticks % self.update  == 0:  
                 self.probDensUpdate() 
 
         #update the number of ticks which have occured
         self.ticks = self.ticks + 1
-        if self.ticks % 100 == 0:
+        if self.ticks % self.update  == 0:
             print('TIME ELAPSED: '+ str(self.ticks*self.dt)+ ' seconds', flush = True)
 
 def innoculationPoint(width, height): 
