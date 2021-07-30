@@ -43,7 +43,7 @@ class Tube(Model):
         beta_star = False,
         c_star = False,
         dt = 0.01, 
-        dx_ = False, 
+        dx_ = 0.0001,
     ):
 
         """
@@ -63,17 +63,11 @@ class Tube(Model):
         self.height = height_
         self.prefix =  str(name)+'_pop'+str(self.population)
         self.pattern = pattern
-
-        #set the size of the grid increments 
-        if not dx_:
-            self.dx = 0.0001
-        else: 
-            self.dx = dx_ 
-
+        self.dx = dx_
         self.dt = dt  #length of the timesteps in the model
+        print('dt'+str(self.dt))
         print('dx '+str(self.dx))
-        print('width '+str(width_))
-        print('nx '+str(width_/self.dx)) 
+
         self.nx = int(width_/self.dx) #number of increments in x direction
         self.ny = int(height_/self.dx) #number of increments in y direction
         self.ticks = 1 #count the number of ticks which have elapsed
@@ -114,7 +108,7 @@ class Tube(Model):
         self.u = self.u0.copy() #current concentration of bacteria
 
         #set the number of ticks to save files for the model 
-        self.update = 20  
+        self.update = 20
 
         global dx, width, height, nx, ny
         dx = self.dx
@@ -142,11 +136,7 @@ class Tube(Model):
                 False,
                 self.prefix,
                 self.pattern,
-                False,
-                False,
-                False, 
-                False,
-                self.dt 
+                dt = self.dt
             )
 
             #add this bacterial agent to the modelling space 
@@ -160,6 +150,7 @@ class Tube(Model):
         """
 
         # get a list containing all of the agents
+        print('POPULATION: ' + str(self.population))
         all_agents = self.schedule.agents
         agent_growthstate = np.array([all_agents[i].next_double for i in range(len(all_agents))])
 
@@ -179,7 +170,7 @@ class Tube(Model):
                 
                 #create a new bacteria agent 
                 bacteria = Bacteria(
-                    self.population+1,
+                    self.population,
                     self,
                     pos,
                     self.width,
@@ -187,11 +178,7 @@ class Tube(Model):
                     True,
                     self.prefix,
                     self.pattern,
-                    False,
-                    False,
-                    False,
-                    False,
-                    self.dt
+                    dt = self.dt
                 )
                 
                 #add this agent to the modelling space 
@@ -303,7 +290,6 @@ class Tube(Model):
 
                         #get the 2 closest points out of these points
                         dist_mat = fastdist.matrix_pairwise_distance(position_list, fastdist.euclidean, "euclidean", return_matrix=True)
-                        #print(position_list)
 
                         #get the index of the minimum
                         idx = np.argwhere(dist_mat == np.min(dist_mat))[0]
@@ -445,12 +431,8 @@ class Tube(Model):
         end = time.time()
         print(end-start)
 
-        #add the cmc to a list 
-        print('CMC') 
-        start = time.time()  
+        #add the cmc to a list
         self.cmcUpdate()
-        end= time.time()       
-        print(end-start) 
 
         #if the model is a tube save the density every 100 ticks 
         if self.width > self.height: 
@@ -461,6 +443,9 @@ class Tube(Model):
         self.ticks = self.ticks + 1
         if self.ticks % self.update  == 0:
             print('TIME ELAPSED: '+ str(self.ticks*self.dt)+ ' seconds', flush = True)
+            print('TICKS: '+str(self.ticks))
+
+        print('POPULATION: '+str(self.population))
 
 def innoculationPoint(width, height): 
     """
@@ -494,7 +479,7 @@ def kde2D(x, y , bandwidth, xbins, ybins, **kwargs):
     xy_train = np.vstack([y, x]).T
 
     #calculate the density kernel
-    kde_skl = KernelDensity(bandwidth=bandwidth, algorithm='kd_tree', rtol=0.01)
+    kde_skl = KernelDensity(bandwidth=bandwidth, algorithm='kd_tree' ,rtol = 0.01)
     kde_skl.fit(xy_train)
 
     # score_samples() returns the log-likelihood of the samples

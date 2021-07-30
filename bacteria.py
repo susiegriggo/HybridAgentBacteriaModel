@@ -139,10 +139,8 @@ class Bacteria(Agent):
         self.c_start = 0
         self.c_end = 0
 
-        #set a timer for when then cell will next reproduce 
-        self.next_double = 0 
-        self.next_double = np.random.normal(doubling_mean, doubling_std, 1)
-
+        #set a timer for when then cell will next reproduce
+        self.next_double = np.random.normal(doubling_mean, doubling_std, 1)[0]
         #if the bacteria is not a daughter cell it could be anywhere in its growth cycle 
         if daughter == False:
 
@@ -477,7 +475,6 @@ class Bacteria(Agent):
             self.next_double = np.random.normal(self.doubling_mean, self.doubling_std, 1)
 
         #get the current timestep in the run/tumble
-        step_num = int(self.timer/self.dt)
         x_new = self.pos[0] + self.velocity*self.status*np.cos(np.deg2rad(self.ang))*self.dt#+np.sqrt(2*D_rot*self.dt)*self.W_x
         y_new = self.pos[1] + self.velocity*self.status*np.sin(np.deg2rad(self.ang))*self.dt#+np.sqrt(2*D_rot*self.dt)*self.W_y
         new_pos = [x_new[0], y_new[0]]

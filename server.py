@@ -21,7 +21,7 @@ args = parser.parse_args()
 
 print('***STARTING SIMULATION***')
 
-model = Tube(args.population, args.width, args.height, args.name, args.pattern, args.beta, args.c, args.dx, args.dt)
+model = Tube(args.population, args.width, args.height, args.name, args.pattern, args.beta, args.c, dx_ = args.dx, dt = args.dt)
 
 print('Simulation started using...')
 print(str(args.population)+' cells')
