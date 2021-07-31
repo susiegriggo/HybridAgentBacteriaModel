@@ -65,7 +65,7 @@ class Tube(Model):
         self.pattern = pattern
         self.dx = dx_
         self.dt = dt  #length of the timesteps in the model
-        print('dt'+str(self.dt))
+        print('dt '+str(self.dt))
         print('dx '+str(self.dx))
 
         self.nx = int(width_/self.dx) #number of increments in x direction
@@ -136,6 +136,7 @@ class Tube(Model):
                 False,
                 self.prefix,
                 self.pattern,
+                self.dx, 
                 dt = self.dt
             )
 
@@ -149,8 +150,7 @@ class Tube(Model):
         the same location as the bacterium which is dividing
         """
 
-        # get a list containing all of the agents
-        print('POPULATION: ' + str(self.population))
+        # get a list containing all of the agents   
         all_agents = self.schedule.agents
         agent_growthstate = np.array([all_agents[i].next_double for i in range(len(all_agents))])
 
@@ -178,6 +178,7 @@ class Tube(Model):
                     True,
                     self.prefix,
                     self.pattern,
+                    self.dx, 
                     dt = self.dt
                 )
                 
@@ -225,8 +226,7 @@ class Tube(Model):
         bacterial_density = self.densityKernel(agent_positions)
 
         #solve the partial differential equation model using the fintie difference method
-        self.u[1:-1, 1:-1] = self.u0[1:-1, 1:-1] + self.D_star * self.dt * ((self.u0[2:, 1:-1] - 2 * self.u0[1:-1, 1:-1] + self.u0[:-2, 1:-1]) / dx2 + (
-                        self.u0[1:-1, 2:] - 2 * self.u0[1:-1, 1:-1] + self.u0[1:-1, :-2]) / dy2) - self.dt * self.beta_star *self.population*bacterial_density[1:-1, 1:-1]
+        self.u[1:-1, 1:-1] = self.u0[1:-1, 1:-1] + self.D_star * self.dt * ((self.u0[2:, 1:-1] - 2 * self.u0[1:-1, 1:-1] + self.u0[:-2, 1:-1]) / dx2 + (self.u0[1:-1, 2:] - 2 * self.u0[1:-1, 1:-1] + self.u0[1:-1, :-2]) / dy2) - self.dt * self.beta_star *self.population*bacterial_density[1:-1, 1:-1]
 
         # set such that the concentration cannot be lowered below zero
         self.u[self.u < 0] = 0
@@ -401,35 +401,35 @@ class Tube(Model):
         """
 
         #perform a step 
-        print('STEP') 
-        start = time.time() 
+        #print('STEP') 
+        #start = time.time() 
         self.schedule.step()
-        end = time.time() 
-        print(end-start)
+        #end = time.time() 
+        #print(end-start)
 
         #ignore the first tick 
         if self.ticks > 1:
-            print('CONCENTRATION') 
-            start = time.time() 
+            #print('CONCENTRATION') 
+            #start = time.time() 
             #evalute the concentration field    
             self.stepConcentration()
-            end = time.time()
-            print(end-start)
+            #end = time.time()
+            #print(end-start)
 
             #correct for colliding cells 
-            print('NEIGHBOURS') 
-            start = time.time() 
+            #print('NEIGHBOURS') 
+            #start = time.time() 
             self.neighbourCollide()
-            end = time.time()
-            print(end-start)
+            #end = time.time()
+            #print(end-start)
 
 
         #update bacterial reproduction
-        print('REPRODUCE') 
-        start = time.time()  
+        #print('REPRODUCE') 
+        #start = time.time()  
         self.bacteriaReproduce()
-        end = time.time()
-        print(end-start)
+        #end = time.time()
+        #print(end-start)
 
         #add the cmc to a list
         self.cmcUpdate()
@@ -444,8 +444,7 @@ class Tube(Model):
         if self.ticks % self.update  == 0:
             print('TIME ELAPSED: '+ str(self.ticks*self.dt)+ ' seconds', flush = True)
             print('TICKS: '+str(self.ticks))
-
-        print('POPULATION: '+str(self.population))
+            print('CURRENT POPULATION: '+str(self.population))
 
 def innoculationPoint(width, height): 
     """

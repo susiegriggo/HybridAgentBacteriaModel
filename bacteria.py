@@ -54,6 +54,7 @@ class Bacteria(Agent):
         daughter,
         model_name,
         pattern,
+        dx, 
         velocity_mean = velocity_mean,
         velocity_std = velocity_std, 
         doubling_mean = doubling_mean, 
@@ -94,6 +95,7 @@ class Bacteria(Agent):
         self.velocity_mean = velocity_mean 
         self.velocity_std = velocity_std
         self.model = model
+        self.dx = dx        
         self.dt = dt  
 
         #parameters universal to all motility patterns
@@ -206,10 +208,10 @@ class Bacteria(Agent):
         y = pos[1]
 
         #bacteria are hitting the left wall
-        if x < 0:
+        if x < self.dx:
 
             #set the cell to be at the left wall 
-            x = 0
+            x = self.dx
 
             #set variable to determine the type of collision
             p = random.uniform(0, 1)
@@ -222,10 +224,10 @@ class Bacteria(Agent):
                     self.ang = (self.ang - 90) % 360
 
         #bacteria are hitting the right wall
-        elif x > model_width:
+        elif x > model_width-self.dx:
 
             #set the cell to be at the right wall 
-            x = model_width-epsilon
+            x = model_width-self.dx-epsilon
 
             #set varible to dermine the type of collision
             p = random.uniform(0, 1)
@@ -238,10 +240,10 @@ class Bacteria(Agent):
                     self.ang = (self.ang + 90) % 360
 
         #bacteria are hitting the bottom wall
-        if y < 0:
+        if y < self.dx:
 
             #set the cell to be at the bottom wall 
-            y = 0
+            y = self.dx
 
             #set variable to determine the type of collision
             p = random.uniform(0, 1)
@@ -254,10 +256,10 @@ class Bacteria(Agent):
                     self.ang = (self.ang - 90)%360
 
         #bacteria are hitting the top wall
-        elif y > model_height:
+        elif y > model_height-self.dx:
 
             #set the cell to be at the top wall 
-            y = model_height-epsilon
+            y = model_height-self.dx-epsilon
 
             #set variable to determine the type of collision
             p = random.uniform(0, 1)
