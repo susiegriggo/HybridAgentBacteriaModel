@@ -290,7 +290,7 @@ class Bacteria(Agent):
         field_pos = [int(round(self.pos[0], int(round_dx)) / conc_dx), int(round(self.pos[1], int(round_dy)) / conc_dy)]
 
         #get this position in the concentration dataframe
-        current_pos = self.model.u[field_pos[0], field_pos[1]]
+        current_pos = self.model.u[1:-1, 1:-1][field_pos[0], field_pos[1]]
         return current_pos
 
     def tumbleStep(self):

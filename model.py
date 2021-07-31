@@ -59,8 +59,8 @@ class Tube(Model):
         """
 
         self.population = int(population)
-        self.width = width_
-        self.height = height_
+        self.width = width_+2*dx_ 
+        self.height = height_+2*dx_
         self.prefix =  str(name)+'_pop'+str(self.population)
         self.pattern = pattern
         self.dx = dx_
@@ -104,7 +104,7 @@ class Tube(Model):
         self.running = True
 
         #generate grid to solve the concentration over
-        self.u0 = self.c_star * np.ones((self.nx+1, self.ny+1)) #starting concentration of bacteria
+        self.u0 = self.c_star * np.ones((self.nx+2, self.ny+2)) #starting concentration of bacteria
         self.u = self.u0.copy() #current concentration of bacteria
 
         #set the number of ticks to save files for the model 
@@ -131,8 +131,8 @@ class Tube(Model):
                 i,
                 self,
                 self.innoculate,
-                self.width,
-                self.height,
+                self.width-2*self.dx,
+                self.height-2*self.dx,
                 False,
                 self.prefix,
                 self.pattern,
@@ -173,8 +173,8 @@ class Tube(Model):
                     self.population,
                     self,
                     pos,
-                    self.width,
-                    self.height,
+                    self.width-2*self.dx,
+                    self.height-2*self.dx,
                     True,
                     self.prefix,
                     self.pattern,
@@ -205,7 +205,7 @@ class Tube(Model):
         bw = scottsRule(x_list, y_list)
 
         #calculate the density kernel
-        xx, yy, zz, = kde2D(x_list,y_list,bw, nx+1,ny+1)
+        xx, yy, zz, = kde2D(x_list,y_list,bw, nx,ny)
 
         return zz
 
@@ -226,8 +226,7 @@ class Tube(Model):
         bacterial_density = self.densityKernel(agent_positions)
 
         #solve the partial differential equation model using the fintie difference method
-        self.u[1:-1, 1:-1] = self.u0[1:-1, 1:-1] + self.D_star * self.dt * ((self.u0[2:, 1:-1] - 2 * self.u0[1:-1, 1:-1] + self.u0[:-2, 1:-1]) / dx2 + (self.u0[1:-1, 2:] - 2 * self.u0[1:-1, 1:-1] + self.u0[1:-1, :-2]) / dy2) - self.dt * self.beta_star *self.population*bacterial_density[1:-1, 1:-1]
-
+        self.u[1:-1, 1:-1] = self.u0[1:-1, 1:-1] + self.D_star * self.dt * ((self.u0[2:, 1:-1] - 2 * self.u0[1:-1, 1:-1] + self.u0[:-2, 1:-1]) / dx2 + (self.u0[1:-1, 2:] - 2 * self.u0[1:-1, 1:-1] + self.u0[1:-1, :-2]) / dy2) - self.dt * self.beta_star *self.population*bacterial_density
         # set such that the concentration cannot be lowered below zero
         self.u[self.u < 0] = 0
 
@@ -471,7 +470,7 @@ def kde2D(x, y , bandwidth, xbins, ybins, **kwargs):
     """ 
 
     #create a grid of the agent locations
-    xx, yy = np.mgrid[0:width:xbins*1j, 0:height:ybins*1j]
+    xx, yy = np.mgrid[0:width-2*dx:xbins*1j, 0:height-2*dx:ybins*1j]
     xy_sample = np.vstack([yy.ravel(), xx.ravel()]).T
 
     #add the posiitions of bacteria to the grid 
