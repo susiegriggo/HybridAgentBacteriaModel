@@ -273,7 +273,8 @@ class Tube(Model):
 
         #get the points where each of these collisions occur 
         colliders = counter_df[counter_df[0] > 1]
-        collider_points = colliders['index'].values    
+        collider_points = colliders['index'].values
+        #print(collider_points)
        
         #loop through the colliding points
         for point in collider_points:
@@ -283,7 +284,7 @@ class Tube(Model):
             
             #if the collision is only between a few cells determine which two cells will collide first 
             if len(idx)<6:
-    
+
                     #get the indices corresponding to the point
                     idx = [i for i, d in enumerate(agent_pos_rounded) if d == point]
 
@@ -309,9 +310,12 @@ class Tube(Model):
 
             #if the collision contains more cells then generate random angles  
             else:
-                
+
                 angles = np.random.uniform(0,360,len(self.schedule.agents))
-                map(mapAngle, self.schedule.agents, angles)  
+
+                map(mapAngle, self.schedule.agents, angles)
+                #switch to tumble
+                #map(mapTimer, self.schedule.agents)
 
     def cmcUpdate(self): 
         """
@@ -511,5 +515,11 @@ def mapAngle(agent, angle):
     """
 
     agent.ang = (self.ang + angle) % 360
+
+def mapTimer(agent):
+    """
+    Helper function to quickly reset the duration timer
+    """
+    agent.timer = 100
     
 

@@ -138,8 +138,8 @@ class Bacteria(Agent):
         self.W_y = np.sqrt(self.dt) * np.random.normal(0, 1, 1)
 
         #concentration of attractant at the start/end of each run
-        self.c_start = 0
-        self.c_end = 0
+        self.c_start = self.model.c_star
+        self.c_end = self.model.c_star
 
         #set a timer for when then cell will next reproduce
         self.next_double = np.random.normal(doubling_mean, doubling_std, 1)[0]
@@ -309,7 +309,7 @@ class Bacteria(Agent):
  
         #check whether the duration is up
         if self.timer >= self.duration:
-          
+
             #if currently tumbling 
             if self.status == 0:
 
@@ -319,12 +319,12 @@ class Bacteria(Agent):
                 #generate a new running angle
                 #if tumbling at the wall has been defined 
                  
-                if self.wall_tumble == True: 
-                    self.wallTumble() 
+                if self.wall_tumble == True:
+                    self.wallTumble()
 
                 ##otherwise just generate a new tumble angle
-                #else: 
-                self.ang = (self.getTumbleAngle(self.ang_mean, self.ang_std) + self.ang) % 360
+                else:
+                    self.ang = (self.getTumbleAngle(self.ang_mean, self.ang_std) + self.ang) % 360
                 
                 #get the duration of the next run
                 self.duration = self.getDuration(self.mean_run)
@@ -342,13 +342,22 @@ class Bacteria(Agent):
                     current_conc = self.getConcentration()
                     self.c_start = self.c_end
                     self.c_end = current_conc
-                    
+
                     #if the concentration has increased 
                     if self.c_end > self.c_start:
 
                         #extend the run
                         self.duration = alpha * self.getDuration(self.mean_run)
                         self.status = 2
+
+                    #if the concentration has not increased switch to a tumble
+                    else:
+
+                        #change the status to a tumble
+                        self.status = 0
+
+                        #get the duration of the tumble
+                        self.duration = self.getDuration(self.mean_tumble)
                 
                 #if extending the run 
                 else:
@@ -370,7 +379,7 @@ class Bacteria(Agent):
         #get the coordinates of the position
         x = self.pos[0]
         y = self.pos[1]
-        #print('ID: '+str(self.unique_id)+'Starting pos: '+str(self.pos)+' ANGLE PRIOR: ' + str(self.ang)) 
+
         #bacteria are hitting the left wall
         if x == 0:
 
@@ -386,7 +395,7 @@ class Bacteria(Agent):
 
             #left edge 
             else: 
-                #print('LEFT') 
+
                 #adjust the angle to leave the wall         
                 while self.ang < 270 and self.ang > 90: 
                     self.ang = (self.getTumbleAngle(self.ang_mean, self.ang_std) + self.ang) % 360
@@ -407,7 +416,7 @@ class Bacteria(Agent):
  
             #right edge 
             else: 
-                #print('RIGHT') 
+
                 #adjust the angle to leave the wall 
                 while self.ang < 90  and self.ang > 270: 
                     self.ang = (self.getTumbleAngle(self.ang_mean, self.ang_std) + self.ang) % 360
@@ -578,7 +587,7 @@ class Bacteria(Agent):
         #update the wiener processes for rotational diffusion
         self.W_x = self.W_x + np.sqrt(self.dt) * np.random.normal(0,1,1)
         self.W_y = self.W_y + np.sqrt(self.dt) * np.random.normal(0,1,1)
-        
+
         # check if the status of the cell needs to be changed
         if self.pattern == 'tumble':
             self.tumbleStep()
