@@ -104,7 +104,14 @@ class Tube(Model):
         self.running = True
 
         #generate grid to solve the concentration over
-        self.u0 = self.c_star * np.ones((self.nx+2, self.ny+2)) #starting concentration of bacteria
+        self.u0 = self.c_star * np.ones((self.nx+3, self.ny+3)) #starting concentration of bacteria
+
+        #set the edges to have 0 concentration 
+        self.u0[0] = np.zeros(self.ny+3)
+        self.u0[-1] = np.zeros(self.ny+3) 
+        self.u0[0:, 0] = np.zeros(self.nx+3)
+        self.u0[0:, -1] = np.zeros(self.nx+3) 
+
         self.u = self.u0.copy() #current concentration of bacteria
 
         #set the number of ticks to save files for the model 
@@ -205,7 +212,7 @@ class Tube(Model):
         bw = scottsRule(x_list, y_list)
 
         #calculate the density kernel
-        xx, yy, zz, = kde2D(x_list,y_list,bw, nx,ny)
+        xx, yy, zz, = kde2D(x_list,y_list,bw, nx+1,ny+1)
 
         return zz
 

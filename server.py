@@ -16,7 +16,7 @@ parser.add_argument("-pat", "--pattern", help = 'motility pattern of the bacteri
 parser.add_argument("-b", "--beta", help = 'scaled value for bacterial consumption', type = float, default = False) 
 parser.add_argument("-c", "--c", help = 'scaled value for the starting concentration of attractant', type = float, default = False) 
 parser.add_argument("-dx", "--dx", help = 'space between nodes - dx', type = float, default = False) 
-parser.add_argument("-dt", "--dt", help = 'size of the timesteps - dt', type = float, default = False) 
+parser.add_argument("-dt", "--dt", help = 'size of the timesteps - dt', type = float, default = 0.01) 
 args = parser.parse_args()
 
 print('***STARTING SIMULATION***')

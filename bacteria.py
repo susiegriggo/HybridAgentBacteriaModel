@@ -59,7 +59,7 @@ class Bacteria(Agent):
         velocity_std = velocity_std, 
         doubling_mean = doubling_mean, 
         doubling_std = doubling_std,
-        dt = 0.01  
+        dt = 0.01,   
     ):
         """
         Create a new Bacteria agent
@@ -153,6 +153,9 @@ class Bacteria(Agent):
         else: 
             self.next_double = np.random.normal(doubling_mean, doubling_std, 1)
     
+        #parameter to determine whether cells tumble at the walls 
+        self.wall_tumble = True 
+
         #set global variables which are reused throughout 
         global model_width
         global model_height
@@ -201,22 +204,23 @@ class Bacteria(Agent):
         """
         Check if the bacteria collide with the side of the tube.
         Peform either an arching or tangental collision 
-        """
-
+        """ 
+    
         #get the coordinates of the position 
         x = pos[0]
         y = pos[1]
-
+        
         #bacteria are hitting the left wall
-        if x < self.dx:
+        if x < 0:
 
             #set the cell to be at the left wall 
-            x = self.dx
+            x = 0
 
             #set variable to determine the type of collision
             p = random.uniform(0, 1)
+ 
 
-            #perform an arch collision
+            #perform a tangent collision 
             if p > arch_collision:
                 if self.ang > 180:
                     self.ag = (self.ang + 90) % 360
@@ -224,10 +228,10 @@ class Bacteria(Agent):
                     self.ang = (self.ang - 90) % 360
 
         #bacteria are hitting the right wall
-        elif x > model_width-self.dx:
+        elif x > model_width:
 
             #set the cell to be at the right wall 
-            x = model_width-self.dx-epsilon
+            x = model_width-epsilon
 
             #set varible to dermine the type of collision
             p = random.uniform(0, 1)
@@ -240,13 +244,14 @@ class Bacteria(Agent):
                     self.ang = (self.ang + 90) % 360
 
         #bacteria are hitting the bottom wall
-        if y < self.dx:
+        if y < 0:
 
             #set the cell to be at the bottom wall 
-            y = self.dx
+            y = 0
 
             #set variable to determine the type of collision
             p = random.uniform(0, 1)
+
             
             #perform an arch collision
             if p > arch_collision:
@@ -256,11 +261,11 @@ class Bacteria(Agent):
                     self.ang = (self.ang - 90)%360
 
         #bacteria are hitting the top wall
-        elif y > model_height-self.dx:
-
+        elif y > model_height:
+            
             #set the cell to be at the top wall 
-            y = model_height-self.dx-epsilon
-
+            y = model_height-epsilon
+        
             #set variable to determine the type of collision
             p = random.uniform(0, 1)
 
@@ -281,26 +286,30 @@ class Bacteria(Agent):
         # get the increase in each direction per unit time
         conc_dx = model_width / self.model.nx 
         conc_dy = model_height / self.model.ny
-
+         
         # find the number of decimal places to round the position to
         round_dx = np.log10(conc_dx) * -1
         round_dy = np.log10(conc_dy) * -1
 
         # get the concentration corresponding to this rounded concetration
         field_pos = [int(round(self.pos[0], int(round_dx)) / conc_dx), int(round(self.pos[1], int(round_dy)) / conc_dy)]
+    
 
         #get this position in the concentration dataframe
         current_pos = self.model.u[1:-1, 1:-1][field_pos[0], field_pos[1]]
+
+        
         return current_pos
 
     def tumbleStep(self):
         """
         Evaluate whether the tumble step needs updating 
         """
-
+      
+ 
         #check whether the duration is up
         if self.timer >= self.duration:
-
+          
             #if currently tumbling 
             if self.status == 0:
 
@@ -308,6 +317,13 @@ class Bacteria(Agent):
                 self.status = 1
 
                 #generate a new running angle
+                #if tumbling at the wall has been defined 
+                 
+                if self.wall_tumble == True: 
+                    self.wallTumble() 
+
+                ##otherwise just generate a new tumble angle
+                #else: 
                 self.ang = (self.getTumbleAngle(self.ang_mean, self.ang_std) + self.ang) % 360
                 
                 #get the duration of the next run
@@ -345,7 +361,75 @@ class Bacteria(Agent):
 
             # reset timer
             self.timer = 0
+    
+    def wallTumble(self): 
+        """
+        Change the angle accordingly if the cell tumbles at the wall 
+        """ 
 
+        #get the coordinates of the position
+        x = self.pos[0]
+        y = self.pos[1]
+        #print('ID: '+str(self.unique_id)+'Starting pos: '+str(self.pos)+' ANGLE PRIOR: ' + str(self.ang)) 
+        #bacteria are hitting the left wall
+        if x == 0:
+
+            #bottom left corner 
+            if y == 0:    
+                while self.ang > 180 or (self.ang < 270 and self.ang > 90): 
+                    self.ang = (self.getTumbleAngle(self.ang_mean, self.ang_std) + self.ang) % 360
+            
+            #top left corner 
+            elif y == model_height - epsilon: 
+                while self.ang > 180 or (self.ang < 270 and self.ang > 90):
+                    self.ang = (self.getTumbleAngle(self.ang_mean, self.ang_std) + self.ang) % 360
+
+            #left edge 
+            else: 
+                #print('LEFT') 
+                #adjust the angle to leave the wall         
+                while self.ang < 270 and self.ang > 90: 
+                    self.ang = (self.getTumbleAngle(self.ang_mean, self.ang_std) + self.ang) % 360
+
+        #bacteria hitting the right wall
+        elif x ==  model_width - epsilon: 
+
+
+            #bottom right corner 
+            if y == 0: 
+                while (self.ang < 90 and self.ang > 270) or self.ang > 180: 
+                    self.ang = (self.getTumbleAngle(self.ang_mean, self.ang_std) + self.ang) % 360
+
+            #top left corner
+            elif y == model_height - epsilon: 
+                while (self.ang < 90 and self.ang > 270) or self.ang < 180: 
+                    self.ang = (self.getTumbleAngle(self.ang_mean, self.ang_std) + self.ang) % 360
+ 
+            #right edge 
+            else: 
+                #print('RIGHT') 
+                #adjust the angle to leave the wall 
+                while self.ang < 90  and self.ang > 270: 
+                    self.ang = (self.getTumbleAngle(self.ang_mean, self.ang_std) + self.ang) % 360
+
+        #bacteria hitting the bottom  
+        elif y == 0: 
+            #print('BOTTOM')
+            #adjust the angle to leave the wall 
+            while self.ang > 180:
+                self.ang = (self.getTumbleAngle(self.ang_mean, self.ang_std) + self.ang) % 360
+            #self.ang = (self.ang +180)%360
+
+        #bacteria hitting the top
+        elif y  == model_height - epsilon: 
+            #print('TOP') 
+            #adjust the angle to leave the wall 
+            while self.ang < 180:
+                self.ang = (self.getTumbleAngle(self.ang_mean, self.ang_std) + self.ang) % 360
+            #self.ang = (self.ang +180)%360
+
+        #print('ID: '+str(self.unique_id)+'ANGLE AFTER ' + str(self.ang))
+ 
     def reverseStep(self):
         """
         Adjust timers for a run and reverse motility pattern.
@@ -429,8 +513,6 @@ class Bacteria(Agent):
                 #if the concentration has increased
                 if self.c_end > self.c_start:
 
-                    #extend the run 
-                    self.duration = alpha * self.duration
                     # self.duration = alpha * self.getDuration(mean_run)
                     self.status = 3
     
@@ -485,8 +567,8 @@ class Bacteria(Agent):
         new_pos = self.checkCollision(new_pos)
         self.pos = new_pos
         self.model.space.move_agent(self, self.pos) 
-
-        #add this timestep to the timer
+      
+        #add this timestep to the timer    
         self.timer = self.timer + self.dt
         self.ticks = self.ticks + 1
 
@@ -496,7 +578,7 @@ class Bacteria(Agent):
         #update the wiener processes for rotational diffusion
         self.W_x = self.W_x + np.sqrt(self.dt) * np.random.normal(0,1,1)
         self.W_y = self.W_y + np.sqrt(self.dt) * np.random.normal(0,1,1)
-
+        
         # check if the status of the cell needs to be changed
         if self.pattern == 'tumble':
             self.tumbleStep()
@@ -515,12 +597,4 @@ class Bacteria(Agent):
                 pos_df = pd.DataFrame({'position': pos_list})
                 pos_df .to_csv('example_position_list_tumble.csv', index = False)
 """
-
-
-
-
-
-
-
-
 
