@@ -17,6 +17,7 @@ from sklearn.neighbors import KernelDensity
 import time
 from fastdist import fastdist
 from collections import Counter
+import pickle 
 
 #set global variables for the tube model
 D_c = 1.e-10 #diffusion coefficient of the nutrients
@@ -460,14 +461,16 @@ class Tube(Model):
         #save these positions periodically 
         if self.ticks % self.update == 0: 
         
-            #construct a dataframe to solve 
-            pos_df = pd.DataFrame(self.trace_list) 
-            pos_df.index  = ['cell '+str(i) for i in range(0, self.tracers)]
-            pos_df.columns = [tick*self.dt+self.dt for tick in range(0, self.ticks)]
+            #make a list of cell labels 
+            cell_labels  = ['cell '+str(i) for i in range(0, self.tracers)]
 
-            #save to a csv file 
-            filename =  str(self.prefix)+'_trace_cells_'+str(self.pattern)+'_pattern_'+'_dt'+str(self.dt)+'_'+str(self.ticks)+'_ticks.csv'
-            pos_df.to_csv(filename) 
+            #construct dictionary of cell locations
+            trace_dict = dict(zip(cell_labels, self.trace_list))
+
+            #save to a .pkl file 
+            filename =  str(self.prefix)+'_trace_cells_'+str(self.pattern)+'_pattern_'+'_dt'+str(self.dt)+'_'+str(self.ticks)+'_ticks.pkl'
+            with open(filename, 'wb') as handle: 
+                pickle.dump(trace_dict, handle, protocol=pickle.HIGHEST_PROTOCOL )
     
     def step(self):
         """
