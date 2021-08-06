@@ -9,6 +9,6 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem-per-cpu=8GB
 
-python server.py -w 0.1 -he 0.01 -p 10000 -s 50000  -n 01cm_tube/test1 -dx 0.0001 -dt 0.01 -pat tumble -c 100 -b 1E-10
+python server.py -w 1 -he 0.1 -p 10000 -s 50000  -n 1cm_tube/test2 -dx 0.001 -dt 0.03 -pat tumble -c 100 -b 1E-9
 
 

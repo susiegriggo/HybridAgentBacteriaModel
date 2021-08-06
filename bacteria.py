@@ -23,20 +23,24 @@ epsilon = 10E-16
 #bias of the bacteria to the nutrients it is consuming 
 alpha =  0.5  
 
-#variables to control the doubling time of the bacteria (seconds) 
-doubling_mean = 360
-doubling_std = 20
-
-#variables to control the veolicty of the bacteria (cm/s) 
-velocity_mean = 2.41E-3 
-velocity_std = 6E-4 
-
-#set the mean duration of a run in a model 
-mean_run = 1 
-
 #wall effects
 arch_collision = 1  #manually set the probability of an arch collision 
 tangent_collision = 1 - arch_collision #probability of a tangential deflection collision
+
+#set the default variables for the bacteria movement
+#variables to control the doubling time of the bacteria (seconds)
+doubling_mean = 360
+doubling_std = 20
+
+#variables to control the veolicty of the bacteria (cm/s)
+velocity_mean = 2.41E-3
+velocity_std = 6E-4
+
+#set the mean duration of a run in a model
+mean_run = 1
+
+#set the distribution to draw the run durations 
+run_dist = 'poisson'
 
 class Bacteria(Agent):
     """
@@ -59,6 +63,8 @@ class Bacteria(Agent):
         velocity_std = velocity_std, 
         doubling_mean = doubling_mean, 
         doubling_std = doubling_std,
+        mean_run  = mean_run, 
+        run_dist = 'poisson', 
         dt = 0.01,   
     ):
         """
@@ -81,43 +87,50 @@ class Bacteria(Agent):
 
         super().__init__(unique_id, model)
 
-        #throw exception if the wrong types of values are passed
+        #throw exception if the wrong type of movement pattern is parsed
         pattern_type = ['tumble', 'reverse', 'flick'] #possible movement patterns
         if pattern not in pattern_type:
             raise ValueError("Pattern must be one of tumble, reverse or flick")
 
+        #throw excepton if the wrong type of run distribution is passed
+        pos_dist  = ['poisson', 'normal' , 'uniform'] #possible distributions
+        if run_dist not in pos_dist:
+            raise ValueError("Incorrect type of distribution") 
+        
+        #model parameters
         self.unique_id = unique_id
         self.pos = np.array(pos)
         self.model_name = model_name
         self.pattern = pattern
+        self.velocity_mean = velocity_mean
+        self.velocity_std = velocity_std
         self.doubling_mean = doubling_mean
         self.doubling_std = doubling_std
-        self.velocity_mean = velocity_mean 
-        self.velocity_std = velocity_std
+        self.run_dist = run_dist
         self.model = model
         self.dx = dx        
         self.dt = dt  
 
         #parameters universal to all motility patterns
         self.velocity = np.random.normal(self.velocity_mean, self.velocity_std, 1)
-        self.mean_run = 1
+        self.mean_run = mean_run 
 
         #set parameters for the run and tumble motility pattern 
         if self.pattern == 'tumble':
             self.ang_mean = 68
             self.ang_std = 37
-            self.mean_tumble = 0.1
+            self.mean_tumble = mean_run/10
             self.duration = self.getDuration(self.mean_tumble)  # stores the time of the duration
             self.status = 0  #starting status, tumble = 0 , run = 1
 
         #set parameters for the run and reverse motility pattern 
-        if self.pattern == 'reverse':
+        elif self.pattern == 'reverse':
             self.reverse_std = 20  # standard deviation of angle
             self.status = 1  # 1 is running, 2 is extending a run
             self.duration = self.getDuration(self.mean_run)  # duration of the first run
 
         #set parameters for the run and reverse and flick motility pattern 
-        if self.pattern == 'flick':
+        elif self.pattern == 'flick':
             self.status = 1  # 1 is running, 2 is extending a run, 3 is flicking
             self.flick_std = 10  # standard deviation of a flick
             self.reverse_std = 2  # standard deviation of a reverse
@@ -187,16 +200,32 @@ class Bacteria(Agent):
 
         return angle
 
-    def getDuration(self, mean_t):
+    def getDuration(self, mean_t, std = 0):
         """
-        Get the duration of a run or tumble using a Poisson distribution
+        Get the duration of a run or tumble using a the specified distribution type 
         """
 
-        #generate a random number between 0 and 1
-        p = random.uniform(0,1)
+        #placeholder duration
+        dur = 0 
+    
+        #poisson distribution 
+        if self.run_dist == 'poisson': 
+        
+            #generate a random number between 0 and 1
+            p = random.uniform(0,1)
 
-        #get the duration
-        dur = (-1)*mean_t*np.log(p)
+            #get the duration
+            dur = (-1)*mean_t*np.log(p)
+
+        #normal distriibution
+        if self.run_dist == 'normal': 
+
+            dur = np.random.normal(mean_t, std_t, 1)
+
+        #uniform distribution
+        if self.run_dist == "uniform":
+        
+            p = random.uniform(0, mean_t) 
 
         return dur
 
@@ -544,7 +573,7 @@ class Bacteria(Agent):
         self.duration = self.getDuration(mean_run)
 
         # get the velocity of the new run
-        self.velocity = np.random.normal(velocity_mean, velocity_std, 1)
+        self.velocity = np.random.normal(self.velocity_mean, self.velocity_std, 1)
 
     def flick(self):
         """Generates a flick for the run reverse flick motility pattern"""
@@ -556,7 +585,7 @@ class Bacteria(Agent):
         self.duration = self.getDuration(mean_run)
 
         # get the velocity of the new run
-        self.velocity = np.random.normal(velocity_mean, velocity_std, 1)
+        self.velocity = np.random.normal(self.velocity_mean, self.velocity_std, 1)
 
     def step(self):
         """
@@ -595,15 +624,4 @@ class Bacteria(Agent):
             self.reverseStep()
         if self.pattern == 'flick':
             self.reverseFlickStep()
-
-"""
-        #save the motility pattern of one of the cells 
-        if self.unique_id == 1:
-            self.pos_list.append(self.pos)
-
-            #save only every 10 second
-            if self.ticks % 1000 == 0:
-                pos_df = pd.DataFrame({'position': pos_list})
-                pos_df .to_csv('example_position_list_tumble.csv', index = False)
-"""
 

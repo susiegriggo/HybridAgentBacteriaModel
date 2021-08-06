@@ -26,7 +26,19 @@ radius = 1*10E-4 #radius of bacteria in centimetres
 
 #scaling parameters
 tau = 1 #time scale
-L = 1 #lengh scalin
+L = 1 #lengh scaling
+
+#set the default variables for the bacteria movement 
+#variables to control the doubling time of the bacteria (seconds)
+doubling_mean = 360
+doubling_std = 20
+
+#variables to control the veolicty of the bacteria (cm/s)
+velocity_mean = 2.41E-3
+velocity_std = 6E-4
+
+#set the mean duration of a run in a model
+mean_run = 1
 
 class Tube(Model):
     """
@@ -42,8 +54,15 @@ class Tube(Model):
         pattern = "tumble",
         beta_star = False,
         c_star = False,
+        velocity_mean = velocity_mean, 
+        velocity_std = velocity_std, 
+        doubling_mean = doubling_mean, 
+        doubling_std = doubling_std, 
+        mean_run = mean_run, 
+        run_dist = 'poisson', 
         dt = 0.01, 
         dx_ = 0.0001,
+        tracers = 20, 
     ):
 
         """
@@ -58,6 +77,7 @@ class Tube(Model):
             c_star = dimensionless starting concentration
         """
 
+        #set the parameters for the tube model 
         self.population = int(population)
         self.width = width_+2*dx_ 
         self.height = height_+2*dx_
@@ -65,17 +85,28 @@ class Tube(Model):
         self.pattern = pattern
         self.dx = dx_
         self.dt = dt  #length of the timesteps in the model
-        print('dt '+str(self.dt))
-        print('dx '+str(self.dx))
-
         self.nx = int(width_/self.dx) #number of increments in x direction
         self.ny = int(height_/self.dx) #number of increments in y direction
         self.ticks = 1 #count the number of ticks which have elapsed
         self.schedule = RandomActivation(self)
         self.space = ContinuousSpace(width_, height_, False)
-        
+        print('dt '+str(self.dt))
+        print('dx '+str(self.dx))
+
+        #set the parameters for the bacteria occupying the model 
+        self.velocity_mean = velocity_mean
+        self.velocity_std = velocity_std
+        self.doubling_mean = doubling_mean
+        self.doubling_std = doubling_std
+        self.mean_run = mean_run 
+        self.run_dist = run_dist
+   
         #set the innoculation point
         self.innoculate = innoculationPoint(self.width, self.height)
+
+        #create a list of lists to store the starting position of each cell
+        self.tracers = tracers #number of bacteria to trace 
+        self.trace_list = [[] for i in range(0,self.tracers)]
 
         #calculate the values for dimensionless parameters
         self.p_inf = self.population/(self.width*self.height) #starting density of bacteria
@@ -143,7 +174,13 @@ class Tube(Model):
                 False,
                 self.prefix,
                 self.pattern,
-                self.dx, 
+                self.dx,
+                velocity_mean = self.velocity_mean, 
+                velocity_std = self.velocity_std, 
+                doubling_mean = self.doubling_mean, 
+                doubling_std = self.doubling_std, 
+                mean_run = self.mean_run, 
+                run_dist = self.run_dist,  
                 dt = self.dt
             )
 
@@ -185,10 +222,16 @@ class Tube(Model):
                     True,
                     self.prefix,
                     self.pattern,
-                    self.dx, 
+                    self.dx,
+                    velocity_mean = self.velocity_mean, 
+                    velocity_std = self.velocity_std, 
+                    doubling_mean = self.doubling_mean, 
+                    doubling_std = self.doubling_std, 
+                    mean_run = self.mean_run,  
+                    run_dist = self.run_dist,  
                     dt = self.dt
                 )
-                
+                                 
                 #add this agent to the modelling space 
                 self.space.place_agent(bacteria, pos)
                 self.schedule.add(bacteria)
@@ -403,7 +446,28 @@ class Tube(Model):
         #create a dataframe 
         dist_df = pd.DataFrame({'x position': density_labels, 'density':density_values})
         
-        return dist_df      
+        return dist_df     
+
+    def updateTrace(self): 
+        """
+        Function to trace a subset of bacterial cells
+        """ 
+        
+        #get the positions of the bacteria with id in a certain range
+        for i in range(0, self.tracers): 
+            self.trace_list[i].append(self.schedule.agents[i].pos) 
+       
+        #save these positions periodically 
+        if self.ticks % self.update == 0: 
+        
+            #construct a dataframe to solve 
+            pos_df = pd.DataFrame(self.trace_list) 
+            pos_df.index  = ['cell '+str(i) for i in range(0, self.tracers)]
+            pos_df.columns = [tick*self.dt+self.dt for tick in range(0, self.ticks)]
+
+            #save to a csv file 
+            filename =  str(self.prefix)+'_trace_cells_'+str(self.pattern)+'_pattern_'+'_dt'+str(self.dt)+'_'+str(self.ticks)+'_ticks.csv'
+            pos_df.to_csv(filename) 
     
     def step(self):
         """
@@ -417,7 +481,7 @@ class Tube(Model):
         #end = time.time() 
         #print(end-start)
 
-        #ignore the first tick 
+        #ignore the first tic 
         if self.ticks > 1:
             #print('CONCENTRATION') 
             #start = time.time() 
@@ -440,6 +504,9 @@ class Tube(Model):
         self.bacteriaReproduce()
         #end = time.time()
         #print(end-start)
+        
+        #update the cell tracker
+        self.updateTrace() 
 
         #add the cmc to a list
         self.cmcUpdate()
