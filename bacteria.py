@@ -346,15 +346,12 @@ class Bacteria(Agent):
                 self.status = 1
 
                 #generate a new running angle
-                #if tumbling at the wall has been defined 
-                 
+                self.ang = (self.getTumbleAngle(self.ang_mean, self.ang_std) + self.ang) % 360
+
+                #if tumbling at the wall has been defined                  
                 if self.wall_tumble == True:
                     self.wallTumble()
 
-                ##otherwise just generate a new tumble angle
-                else:
-                    self.ang = (self.getTumbleAngle(self.ang_mean, self.ang_std) + self.ang) % 360
-                
                 #get the duration of the next run
                 self.duration = self.getDuration(self.mean_run)
                 
