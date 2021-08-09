@@ -16,7 +16,8 @@ radius = 1E-4  # cm
 
 #calcualte the rotational diffusion coefficient 
 D_rot = (k*T)/(8*np.pi*eta*np.power(radius,3))
-
+D_rot = D_rot*1E-9
+D_rot = 0
 #small value to adjust edges of the modelling space 
 epsilon = 10E-16 
 
@@ -42,6 +43,10 @@ mean_run = 1
 #set the distribution to draw the run durations 
 run_dist = 'poisson'
 
+#set the default tumble angle and standard deviation 
+tumble_angle_mean = 68 
+tumble_angle_std = 37 
+
 class Bacteria(Agent):
     """
     Create a bacterium object 
@@ -65,6 +70,8 @@ class Bacteria(Agent):
         doubling_std = doubling_std,
         mean_run  = mean_run, 
         run_dist = 'poisson', 
+        tumble_angle_mean = tumble_angle_mean, 
+        tumble_angle_std = tumble_angle_std, 
         dt = 0.01,   
     ):
         """
@@ -117,8 +124,8 @@ class Bacteria(Agent):
 
         #set parameters for the run and tumble motility pattern 
         if self.pattern == 'tumble':
-            self.ang_mean = 68
-            self.ang_std = 37
+            self.ang_mean = tumble_angle_mean
+            self.ang_std = tumble_angle_std
             self.mean_tumble = mean_run/10
             self.duration = self.getDuration(self.mean_tumble)  # stores the time of the duration
             self.status = 0  #starting status, tumble = 0 , run = 1
@@ -147,8 +154,8 @@ class Bacteria(Agent):
         self.ticks = 1
 
         #wiener process for rotational diffusion
-        self.W_x = np.sqrt(self.dt) * np.random.normal(0, 1, 1)
-        self.W_y = np.sqrt(self.dt) * np.random.normal(0, 1, 1)
+        self.W_x = np.sqrt(self.dt) * np.random.normal(0, 1)
+        self.W_y = np.sqrt(self.dt) * np.random.normal(0, 1)
 
         #concentration of attractant at the start/end of each run
         self.c_start = self.model.c_star
@@ -168,6 +175,10 @@ class Bacteria(Agent):
     
         #parameter to determine whether cells tumble at the walls 
         self.wall_tumble = True 
+
+        #set the type of reorientation events 
+        #work by Nakai et al. showed that whe peritrichous bacteria reorientate it is biased up or down gradient 
+        self.biased  = True 
 
         #set global variables which are reused throughout 
         global model_width
@@ -344,10 +355,7 @@ class Bacteria(Agent):
 
                 #change to a run 
                 self.status = 1
-
-                #generate a new running angle
-                self.ang = (self.getTumbleAngle(self.ang_mean, self.ang_std) + self.ang) % 360
-
+                
                 #if tumbling at the wall has been defined                  
                 if self.wall_tumble == True:
                     self.wallTumble()
@@ -384,7 +392,15 @@ class Bacteria(Agent):
 
                         #get the duration of the tumble
                         self.duration = self.getDuration(self.mean_tumble)
-                
+
+                        #get the angle of the next run 
+                        if self.biased == False: 
+                            #reorientation from Bergs lognormal distribution
+                            self.ang = (self.getTumbleAngle(self.ang_mean, self.ang_std) + self.ang) % 360
+                        else: 
+                            #generate a new random angle 
+                            self.ang = (np.random.uniform(0, 359, 1) + self.ang) % 360 
+
                 #if extending the run 
                 else:
 
@@ -393,7 +409,14 @@ class Bacteria(Agent):
 
                     #get the duration of the tumble 
                     self.duration = self.getDuration(self.mean_tumble)
-
+                    
+                    #get the angle of the next run 
+                    if self.biased == False: 
+                        self.ang = (self.getTumbleAngle(self.ang_mean, self.ang_std) + self.ang) % 360
+                    else: 
+                        #generate a small angle 
+                        self.ang = (np.random.normal(self.ang_mean, self.ang_std) + self.ang) % 360
+                    
             # reset timer
             self.timer = 0
     
@@ -594,9 +617,14 @@ class Bacteria(Agent):
             self.next_double = np.random.normal(self.doubling_mean, self.doubling_std, 1)
 
         #get the current timestep in the run/tumble
-        x_new = self.pos[0] + self.velocity*self.status*np.cos(np.deg2rad(self.ang))*self.dt#+np.sqrt(2*D_rot*self.dt)*self.W_x
-        y_new = self.pos[1] + self.velocity*self.status*np.sin(np.deg2rad(self.ang))*self.dt#+np.sqrt(2*D_rot*self.dt)*self.W_y
+        x_new = self.pos[0] + self.velocity*self.status*np.cos(np.deg2rad(self.ang))*self.dt+np.sqrt(2*D_rot*self.dt)*self.W_x
+        y_new = self.pos[1] + self.velocity*self.status*np.sin(np.deg2rad(self.ang))*self.dt+np.sqrt(2*D_rot*self.dt)*self.W_y
         new_pos = [x_new[0], y_new[0]]
+        
+        #print('Y change: '+str( self.velocity*self.status*np.sin(np.deg2rad(self.ang))))
+        #print('X change: '+str( self.velocity*self.status*np.cos(np.deg2rad(self.ang))))
+        #print('X rotational diffusion: '+str(np.sqrt(2*D_rot*self.dt)*self.W_x))
+        #print('Y rotational diffusion: '+str(np.sqrt(2*D_rot*self.dt)*self.W_y))
 
         #adjust the position for a collisioni 
         new_pos = self.checkCollision(new_pos)
@@ -611,8 +639,8 @@ class Bacteria(Agent):
         self.next_double = self.next_double - self.dt
 
         #update the wiener processes for rotational diffusion
-        self.W_x = self.W_x + np.sqrt(self.dt) * np.random.normal(0,1,1)
-        self.W_y = self.W_y + np.sqrt(self.dt) * np.random.normal(0,1,1)
+        self.W_x = self.W_x + np.sqrt(self.dt) * np.random.normal(0,1)
+        self.W_y = self.W_y + np.sqrt(self.dt) * np.random.normal(0,1)
 
         # check if the status of the cell needs to be changed
         if self.pattern == 'tumble':
