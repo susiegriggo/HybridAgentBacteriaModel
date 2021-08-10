@@ -25,7 +25,7 @@ epsilon = 10E-16
 alpha =  0.5  
 
 #wall effects
-arch_collision = 1  #manually set the probability of an arch collision 
+arch_collision = 0  #manually set the probability of an arch collision 
 tangent_collision = 1 - arch_collision #probability of a tangential deflection collision
 
 #set the default variables for the bacteria movement
@@ -158,8 +158,9 @@ class Bacteria(Agent):
         self.W_y = np.sqrt(self.dt) * np.random.normal(0, 1)
 
         #concentration of attractant at the start/end of each run
-        self.c_start = self.model.c_star
-        self.c_end = self.model.c_star
+    #assume that previous concnetration was 0 so that any change is an increase
+        self.c_start = 0
+        self.c_end = 0 
 
         #set a timer for when then cell will next reproduce
         self.next_double = np.random.normal(doubling_mean, doubling_std, 1)[0]
@@ -400,8 +401,9 @@ class Bacteria(Agent):
                         else: 
                             #generate a new random angle 
                             self.ang = (np.random.uniform(0, 359, 1) + self.ang) % 360 
+                            #print('random generated') 
 
-                #if extending the run 
+                #if the run is currently being extended  
                 else:
 
                     #switch to a tumble
@@ -410,13 +412,34 @@ class Bacteria(Agent):
                     #get the duration of the tumble 
                     self.duration = self.getDuration(self.mean_tumble)
                     
-                    #get the angle of the next run 
+                    #get the angle of the next run for the unbiased case 
                     if self.biased == False: 
                         self.ang = (self.getTumbleAngle(self.ang_mean, self.ang_std) + self.ang) % 360
+
                     else: 
-                        #generate a small angle 
-                        self.ang = (np.random.normal(self.ang_mean, self.ang_std) + self.ang) % 360
+
+                        #see if the concentration has increased during the extension 
+                        current_conc = self.getConcentration()
+                        self.c_start = self.c_end
+                        self.c_end = current_conc
+
+                        #if the concentration has increased
+                        if self.c_end > self.c_start:
+
+                            #generate a direction for the cell to go 
+                            direction = np.random.randint(0,1)
+                            if direction == 0: 
+                                direction = -1
+
+                            #generate a small angle 
+                            self.ang = (np.random.normal(self.ang_mean, self.ang_std)*direction + self.ang) % 360
                     
+                        #if the concentration has not increased 
+                        else: 
+
+                            #generate a random angle 
+                            self.ang = (np.random.uniform(0, 359, 1) + self.ang) % 360
+                        
             # reset timer
             self.timer = 0
     
