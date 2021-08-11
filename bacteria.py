@@ -25,7 +25,7 @@ epsilon = 10E-16
 alpha =  0.5  
 
 #wall effects
-arch_collision = 0  #manually set the probability of an arch collision 
+arch_collision = 0 #manually set the probability of an arch collision 
 tangent_collision = 1 - arch_collision #probability of a tangential deflection collision
 
 #set the default variables for the bacteria movement
@@ -158,12 +158,13 @@ class Bacteria(Agent):
         self.W_y = np.sqrt(self.dt) * np.random.normal(0, 1)
 
         #concentration of attractant at the start/end of each run
-    #assume that previous concnetration was 0 so that any change is an increase
+        #assume that previous concnetration was 0 so that any change is an increase
         self.c_start = 0
         self.c_end = 0 
 
         #set a timer for when then cell will next reproduce
         self.next_double = np.random.normal(doubling_mean, doubling_std, 1)[0]
+
         #if the bacteria is not a daughter cell it could be anywhere in its growth cycle 
         if daughter == False:
 
@@ -175,7 +176,10 @@ class Bacteria(Agent):
             self.next_double = np.random.normal(doubling_mean, doubling_std, 1)
     
         #parameter to determine whether cells tumble at the walls 
-        self.wall_tumble = True 
+        if arch_collision > 0: 
+            self.wall_tumble = True
+        else: 
+            self.wall_tumble  = False 
 
         #set the type of reorientation events 
         #work by Nakai et al. showed that whe peritrichous bacteria reorientate it is biased up or down gradient 
@@ -346,7 +350,6 @@ class Bacteria(Agent):
         """
         Evaluate whether the tumble step needs updating 
         """
-      
  
         #check whether the duration is up
         if self.timer >= self.duration:

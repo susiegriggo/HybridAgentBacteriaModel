@@ -21,8 +21,13 @@ velocity_std = 6E-4
 mean_run = 1
 
 #defualt run distribution 
-dist = 'poisson' 
+dist = 'poisson'
 
+#set the default tumble angle and standard deviation
+tumble_angle_mean = 68
+tumble_angle_std = 37
+ 
+#arguments to parse
 parser = argparse.ArgumentParser()
 parser.add_argument("-p", "--population", help = 'number of cells in the starting bacterial population', type = int)
 parser.add_argument("-w", "--width", help = 'width of the modelling space', type = float)
@@ -39,6 +44,8 @@ parser.add_argument("-dm", "--doubling_mean", help = 'the mean doubling time for
 parser.add_argument("-ds", "--doubling_std", help = 'the standard deviation of the doubling time for bacterial reproduction', type = float, default = doubling_std)
 parser.add_argument("-mr", "--mean_run", help = 'the mean run time for a bacterial run', type = float, default = mean_run)
 parser.add_argument("-rd", "--run_distribution", help = 'the distribution used to draw the run and tumble durations', type = str, default = dist) 
+parser.add_argument("-tumb_mean", "--tumble_angle_mean", help = 'the mean tumble angle to use for the tumble reorientations', type = float, default = tumble_angle_mean) 
+parser.add_argument("-tumb_std", "--tumble_angle_std", help = "the standard deviation of tumble angle to use for the tumble reorientations", type = float, default = tumble_angle_std) 
 parser.add_argument("-dt", "--dt", help = 'size of the timesteps - dt', type = float, default = 0.01) 
 args = parser.parse_args()
 
@@ -57,6 +64,8 @@ model = Tube(args.population,
         doubling_std = args.doubling_std, 
         mean_run = args.mean_run, 
         run_dist = args.run_distribution, 
+        tumble_angle_mean= args.tumble_angle_mean, 
+        tumble_angle_std = args.tumble_angle_std, 
         dx_ = args.dx,  
         dt = args.dt)
 

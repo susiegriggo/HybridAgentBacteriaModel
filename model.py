@@ -41,6 +41,11 @@ velocity_std = 6E-4
 #set the mean duration of a run in a model
 mean_run = 1
 
+#set the default tumble angle and standard deviation
+tumble_angle_mean = 68
+tumble_angle_std = 37
+
+
 class Tube(Model):
     """
     Creates tube mode. Handles scheduling of the agents and calculates the densities of bacteria.
@@ -60,7 +65,9 @@ class Tube(Model):
         doubling_mean = doubling_mean, 
         doubling_std = doubling_std, 
         mean_run = mean_run, 
-        run_dist = 'poisson', 
+        run_dist = 'poisson',
+        tumble_angle_mean = tumble_angle_mean, 
+        tumble_angle_std = tumble_angle_std,  
         dt = 0.01, 
         dx_ = 0.0001,
         tracers = 20, 
@@ -101,6 +108,8 @@ class Tube(Model):
         self.doubling_std = doubling_std
         self.mean_run = mean_run 
         self.run_dist = run_dist
+        self.tumble_angle_mean = tumble_angle_mean
+        self.tumble_angle_std = tumble_angle_std
    
         #set the innoculation point
         self.innoculate = innoculationPoint(self.width, self.height)
@@ -182,6 +191,8 @@ class Tube(Model):
                 doubling_std = self.doubling_std, 
                 mean_run = self.mean_run, 
                 run_dist = self.run_dist,  
+                tumble_angle_mean = self.tumble_angle_mean, 
+                tumble_angle_std = self.tumble_angle_std,
                 dt = self.dt
             )
 
@@ -230,6 +241,8 @@ class Tube(Model):
                     doubling_std = self.doubling_std, 
                     mean_run = self.mean_run,  
                     run_dist = self.run_dist,  
+                    tumble_angle_mean = self.tumble_angle_mean,
+                    tumble_angle_std = self.tumble_angle_std,
                     dt = self.dt
                 )
                                  
@@ -448,6 +461,33 @@ class Tube(Model):
         dist_df = pd.DataFrame({'x position': density_labels, 'density':density_values})
         
         return dist_df     
+
+    def computeMSD(self, t):
+        """
+        Compute the Mean Squared Displacement
+        """
+        
+        #get the coordinates of the agents
+        x = [agent.pos[0] for agent in self.schedule.agents]
+        y = [agent.pos[1] for agent in self.schedule.agents] 
+        xy = np.array((x,y)).T 
+
+        #generate the times for each tick 
+        t = np.linspace(0,self.ticks*self.dt,self.ticks+1)
+ 
+        agent_pos = [self.schedule.agents]
+        shifts = np.floor(t / self.dt).astype(np.int)
+        msds = np.zeros(shifts.size)
+        msds_std = np.zeros(shifts.size)
+
+        for i, shift in enumerate(shifts):
+            diffs = xy[:-shift if shift else None] - xy[shift:]
+            sqdist = np.square(diffs).sum(axis=1)
+            msds[i] = sqdist.mean()
+            msds_std[i] = sqdist.std(ddof=1)
+
+        msds = pd.DataFrame({'msds': msds, 'tau': t, 'msds_std': msds_std})
+        return msds
 
     def updateTrace(self): 
         """
