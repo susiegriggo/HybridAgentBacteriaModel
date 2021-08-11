@@ -264,13 +264,30 @@ class Bacteria(Agent):
             #set variable to determine the type of collision
             p = random.uniform(0, 1)
  
-
             #perform a tangent collision 
             if p > arch_collision:
-                if self.ang > 180:
-                    self.ag = (self.ang + 90) % 360
+
+            #bottom left corner
+                if y <= 0:
+                    while self.ang > 180 or (self.ang < 270 and self.ang > 90):
+                            self.ang = (self.getTumbleAngle(self.ang_mean, self.ang_std) + self.ang) % 360
+
+                #top left corner
+                elif y >= model_height - epsilon:
+                    while self.ang > 180 or (self.ang < 270 and self.ang > 90):
+                            self.ang = (self.getTumbleAngle(self.ang_mean, self.ang_std) + self.ang) % 360
+
+                #left edge
                 else:
-                    self.ang = (self.ang - 90) % 360
+
+                    #adjust the angle to leave the wall
+                    while self.ang < 270 and self.ang > 90:
+                        self.ang = (self.getTumbleAngle(self.ang_mean, self.ang_std) + self.ang) % 360
+
+                #if self.ang > 180:
+                #    self.ang = (self.ang + 90) % 360
+                #else:
+                #    self.ang = (self.ang - 90) % 360
 
         #bacteria are hitting the right wall
         elif x > model_width:
@@ -283,10 +300,28 @@ class Bacteria(Agent):
 
             #perform an arch collision 
             if p > arch_collision:
-                if self.ang > 180:
-                    self.ang = (self.ang - 90) % 360
+
+        #bottom right corner
+                if y <= 0:
+                    while (self.ang < 90 and self.ang > 270) or self.ang > 180:
+                            self.ang = (self.getTumbleAngle(self.ang_mean, self.ang_std) + self.ang) % 360
+
+                #top left corner
+                elif y <= model_height - epsilon:
+                    while (self.ang < 90 and self.ang > 270) or self.ang < 180:
+                            self.ang = (self.getTumbleAngle(self.ang_mean, self.ang_std) + self.ang) % 360
+
+                #right edge
                 else:
-                    self.ang = (self.ang + 90) % 360
+
+                    #adjust the angle to leave the wall
+                    while self.ang < 90  and self.ang > 270:
+                            self.ang = (self.getTumbleAngle(self.ang_mean, self.ang_std) + self.ang) % 360
+        
+                #if self.ang > 180:
+                #    self.ang = (self.ang - 90) % 360
+                #else:
+                #    self.ang = (self.ang + 90) % 360
 
         #bacteria are hitting the bottom wall
         if y < 0:
@@ -300,10 +335,22 @@ class Bacteria(Agent):
             
             #perform an arch collision
             if p > arch_collision:
-                if self.ang > 270:
-                    self.ang = (self.ang + 90)% 360
-                else:
-                    self.ang = (self.ang - 90)%360
+
+            #print('BOTTOM')
+            #adjust the angle to leave the wall
+            #while self.ang > 180:
+
+
+                while self.ang > 180:
+                    self.ang = (self.getTumbleAngle(self.ang_mean, self.ang_std) + self.ang) % 360
+
+            #    self.ang = (self.getTumbleAngle(self.ang_mean, self.ang_std) + self.ang) % 360
+            #self.ang = (self.ang +180)%360
+
+                #if self.ang > 270:
+                #    self.ang = (self.ang + 90)% 360
+                #else:
+                #    self.ang = (self.ang - 90)%360
 
         #bacteria are hitting the top wall
         elif y > model_height:
@@ -316,10 +363,14 @@ class Bacteria(Agent):
 
             #perform an arch collision
             if p > arch_collision:
-                if self.ang < 90:
-                    self.ang = (self.ang - 90) % 360
-                else:
-                    self.ang = (self.ang + 90) % 360
+
+                while self.ang < 180:
+                    self.ang = (self.getTumbleAngle(self.ang_mean, self.ang_std) + self.ang) % 360
+
+                #if self.ang < 90:
+                #    self.ang = (self.ang - 90) % 360
+                #else:
+                #    self.ang = (self.ang + 90) % 360
 
         return [x,y]
 
@@ -406,6 +457,9 @@ class Bacteria(Agent):
                             self.ang = (np.random.uniform(0, 359, 1) + self.ang) % 360 
                             #print('random generated') 
 
+                    #save the angle to the orientation list 
+                    self.model.ang_list.append(self.ang) 
+ 
                 #if the run is currently being extended  
                 else:
 

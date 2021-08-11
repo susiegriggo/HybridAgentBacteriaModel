@@ -118,6 +118,9 @@ class Tube(Model):
         self.tracers = tracers #number of bacteria to trace 
         self.trace_list = [[] for i in range(0,self.tracers)]
 
+        #list to store the angles to look at the distribution of angles
+        self.ang_list = [] 
+
         #calculate the values for dimensionless parameters
         self.p_inf = self.population/(self.width*self.height) #starting density of bacteria
         self.D_star = (D_c*tau)/(L*L)
@@ -510,8 +513,19 @@ class Tube(Model):
             #save to a .pkl file 
             filename =  str(self.prefix)+'_trace_cells_'+str(self.pattern)+'_pattern_'+'_dt'+str(self.dt)+'_'+str(self.ticks)+'_ticks.pkl'
             with open(filename, 'wb') as handle: 
-                pickle.dump(trace_dict, handle, protocol=pickle.HIGHEST_PROTOCOL )
-    
+                pickle.dump(trace_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+    def saveAngles(self):
+        """
+        Save the angles to a list to study their distribution 
+        """
+
+        #get the filename of the angle file 
+        filename = str(self.prefix)+'_angle_distribution_'+str(self.pattern)+'_pattern_'+'_dt'+str(self.dt)+'_'+str(self.ticks)+'_ticks.txt'
+
+        #save the angle list to a csv file 
+        np.savetxt(filename, self.ang_list, delimiter=",", fmt='%1.3f')
+
     def step(self):
         """
         Combine methods to do one step of the model
@@ -553,6 +567,10 @@ class Tube(Model):
 
         #add the cmc to a list
         self.cmcUpdate()
+
+        #save the angle distribution to a file 
+        if self.ticks % self.update == 0: 
+            self.saveAngles() 
 
         #if the model is a tube save the density every 100 ticks 
         if self.width > self.height: 
