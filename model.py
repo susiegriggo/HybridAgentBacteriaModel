@@ -11,10 +11,8 @@ from mesa.time import RandomActivation
 from bacteria import Bacteria
 
 import numpy as np
-import statsmodels.api as sm
 import pandas as pd
 from sklearn.neighbors import KernelDensity
-import time
 from fastdist import fastdist
 from collections import Counter
 import pickle 
@@ -44,7 +42,6 @@ mean_run = 1
 #set the default tumble angle and standard deviation
 tumble_angle_mean = 68
 tumble_angle_std = 37
-
 
 class Tube(Model):
     """
@@ -153,6 +150,7 @@ class Tube(Model):
         self.u0[0:, 0] = np.zeros(self.nx+3)
         self.u0[0:, -1] = np.zeros(self.nx+3) 
 
+        #placehodler for the concentration field for the previous timestep
         self.u = self.u0.copy() #current concentration of bacteria
 
         #set the number of ticks to save files for the model 
@@ -164,7 +162,6 @@ class Tube(Model):
         ny = self.ny
         width = self.width
         height = self.height
-
 
     def make_agents(self):
         """
@@ -267,6 +264,13 @@ class Tube(Model):
 
         #calculate the bandwidth
         bw = scottsRule(x_list, y_list)
+
+        #test version
+        xx, yy, zz, = kde2D(x_list, y_list, bw, nx + 1, ny)
+        dens_df = pd.DataFrame(zz)
+        if self.ticks % self.update == 0:
+            name = 'testdens_' + str(self.ticks)+'_ticks.csv'
+            dens_df.to_csv(name, index=False)
 
         #calculate the density kernel
         xx, yy, zz, = kde2D(x_list,y_list,bw, nx+1,ny+1)
@@ -536,10 +540,9 @@ class Tube(Model):
             #correct for colliding cells 
             #print('NEIGHBOURS') 
             #start = time.time() 
-            self.neighbourCollide()
+            #self.neighbourCollide()
             #end = time.time()
             #print(end-start)
-
 
         #update bacterial reproduction
         #print('REPRODUCE') 
@@ -588,8 +591,7 @@ def innoculationPoint(width, height):
 def kde2D(x, y , bandwidth, xbins, ybins, **kwargs):
     """ 
     Calculate the Gausian density kernel using the current location of the bacterial cells 
-    """ 
-
+    """
     #create a grid of the agent locations
     xx, yy = np.mgrid[0:width-2*dx:xbins*1j, 0:height-2*dx:ybins*1j]
     xy_sample = np.vstack([yy.ravel(), xx.ravel()]).T
