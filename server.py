@@ -4,7 +4,7 @@ The population size, width and height of the modelling space can be set using th
 """
 from model import Tube
 import argparse
-import time 
+import time
 
 
 #default values 
