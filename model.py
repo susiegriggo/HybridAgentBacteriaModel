@@ -302,8 +302,8 @@ class Tube(Model):
 
         #save updated versions of the density and concentration periodically
         if self.ticks % self.update  == 0: #save every 100 ticks (i.e every 10 seconds)
-            concfield_name = str(self.prefix)+'_concentration_field_'+str(self.pattern)+'_pattern_'+'_dt'+str(self.dt)+'_'+str(self.ticks) + "_ticks.csv"
-            densfield_name = str(self.prefix)+'_density_field_' +str(self.pattern)+'_pattern_'+'_dt'+str(self.dt)+'_'+str(self.ticks) + "_ticks.csv"
+            concfield_name = str(self.prefix)+'_concentration_field_'+str(self.pattern)+'_pattern_'+str(self.run_dist)+'_dt'+str(self.dt)+'_'+str(self.ticks) + "_ticks.csv"
+            densfield_name = str(self.prefix)+'_density_field_' +str(self.pattern)+'_pattern_'+str(self.run_dist)+'_dt'+str(self.dt)+'_'+str(self.ticks) + "_ticks.csv"
 
             #save the concentration field to a file 
             u_df = pd.DataFrame(self.u)
@@ -398,7 +398,7 @@ class Tube(Model):
             cmc_df = pd.DataFrame({'time (seconds)':df_labels, 'CMC': self.cmc_list})
 
             #get the prefix to save the cmc_df 
-            cmc_prefix = str(self.prefix)+'_cmc_df_'+str(self.pattern)+'_pattern_'+'_dt'+str(self.dt)+'_'+str(self.ticks)+'_ticks.csv'
+            cmc_prefix = str(self.prefix)+'_cmc_df_'+str(self.pattern)+'_pattern_'+str(self.run_dist)+'_dt'+str(self.dt)+'_'+str(self.ticks)+'_ticks.csv'
             
             #save the cmc_df 
             cmc_df.to_csv(cmc_prefix, index = False )
@@ -435,7 +435,7 @@ class Tube(Model):
         this_probdens = self.probDens()
 
         #get the prefix to save the density dataframe 
-        probdens_prefix = str(self.prefix)+'_probdens_df_'+str(self.pattern)+'_pattern_'+'_dt'+str(self.dt)+'_'+str(self.ticks)+'_ticks.csv'
+        probdens_prefix = str(self.prefix)+'_probdens_df_'+str(self.pattern)+'_pattern_'+str(self.run_dist)+'_dt'+str(self.dt)+'_'+str(self.ticks)+'_ticks.csv'
 
         #save the dataframe 
         this_probdens.to_csv(probdens_prefix, index = False)

@@ -570,8 +570,8 @@ class Bacteria(Agent):
             elif self.status == 1:
 
                 #see if the concentration has increased from the start of the run 
-                current_conc = self.pos[0]
-                #current_conc = self.getConcentration()
+                #current_conc = self.pos[0]
+                current_conc = self.getConcentration()
                 self.c_start = self.c_end
                 self.c_end = current_conc
 
@@ -621,8 +621,8 @@ class Bacteria(Agent):
             elif self.status == 2:
 
                 #get the concentration at the start and end of the run 
-                current_conc = self.pos[0]
-                #current_conc = self.getConcentration()
+                #current_conc = self.pos[0]
+                current_conc = self.getConcentration()
                 self.c_start = self.c_end
                 self.c_end = current_conc
 
