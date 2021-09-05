@@ -58,7 +58,7 @@ class Tube(Model):
         beta_star = False,
         c_star = False,
         velocity_mean = velocity_mean, 
-        velocity_std = velocity_std, 
+        velocity_std = velocity_std,
         doubling_mean = doubling_mean, 
         doubling_std = doubling_std, 
         mean_run = mean_run, 
@@ -112,7 +112,7 @@ class Tube(Model):
         self.innoculate = innoculationPoint(self.width, self.height)
 
         #create a list of lists to store the starting position of each cell
-        self.tracers = tracers #number of bacteria to trace 
+        self.tracers = self.population #number of bacteria to trace
         self.trace_list = [[] for i in range(0,self.tracers)]
 
         #list to store the angles to look at the distribution of angles
@@ -145,19 +145,21 @@ class Tube(Model):
         self.running = True
 
         #generate grid to solve the concentration over
-        self.u0 = self.c_star * np.ones((self.nx+3, self.ny+3)) #starting concentration of bacteria
+        #self.u0 = self.c_star * np.ones((self.nx+3, self.ny+3)) #starting concentration of bacteria
+        self.u0 = self.c_star * np.ones((self.nx + 1, self.ny + 1))
 
+        """
         #set the edges to have 0 concentration 
         self.u0[0] = np.zeros(self.ny+3)
         self.u0[-1] = np.zeros(self.ny+3) 
         self.u0[0:, 0] = np.zeros(self.nx+3)
         self.u0[0:, -1] = np.zeros(self.nx+3) 
-
+        """
         #placehodler for the concentration field for the previous timestep
         self.u = self.u0.copy() #current concentration of bacteria
 
         #set the number of ticks to save files for the model 
-        self.update = 20
+        self.update = 5
 
         global dx, width, height, nx, ny
         dx = self.dx
@@ -268,15 +270,8 @@ class Tube(Model):
         #calculate the bandwidth
         bw = scottsRule(x_list, y_list)
 
-        #test version
-        xx, yy, zz, = kde2D(x_list, y_list, bw, nx + 1, ny)
-        dens_df = pd.DataFrame(zz)
-        if self.ticks % self.update == 0:
-            name = 'testdens_' + str(self.ticks)+'_ticks.csv'
-            dens_df.to_csv(name, index=False)
-
         #calculate the density kernel
-        xx, yy, zz, = kde2D(x_list,y_list,bw, nx+1,ny+1)
+        xx, yy, zz, = kde2D(x_list,y_list,bw, nx-1,ny-1)
 
         return zz
 
@@ -298,6 +293,7 @@ class Tube(Model):
 
         #solve the partial differential equation model using the fintie difference method
         self.u[1:-1, 1:-1] = self.u0[1:-1, 1:-1] + self.D_star * self.dt * ((self.u0[2:, 1:-1] - 2 * self.u0[1:-1, 1:-1] + self.u0[:-2, 1:-1]) / dx2 + (self.u0[1:-1, 2:] - 2 * self.u0[1:-1, 1:-1] + self.u0[1:-1, :-2]) / dy2) - self.dt * self.beta_star *self.population*bacterial_density
+
         # set such that the concentration cannot be lowered below zero
         self.u[self.u < 0] = 0
 
@@ -422,6 +418,7 @@ class Tube(Model):
 
         #get the x coordinate of the innoculation point
         inn_x = self.innoculate[0]
+
 
         #calculate the cmc
         cmc = (mean_pos - inn_x)/(0.5*self.width)
@@ -552,7 +549,7 @@ class Tube(Model):
             #print(end-start)
 
             #correct for colliding cells 
-            print('NEIGHBOURS') 
+            #print('NEIGHBOURS')
             #start = time.time() 
             #self.neighbourCollide()
             #end = time.time()
@@ -569,7 +566,7 @@ class Tube(Model):
         self.updateTrace() 
 
         #add the cmc to a list
-        self.cmcUpdate()
+        #self.cmcUpdate()
 
         #save the angle distribution to a file 
         if self.ticks % self.update == 0: 
@@ -603,7 +600,7 @@ def innoculationPoint(width, height):
 
     #innoculate in the centre of the y direction
     y = height/2
-    
+
     return np.array((x,y))
 
 def kde2D(x, y , bandwidth, xbins, ybins, **kwargs):

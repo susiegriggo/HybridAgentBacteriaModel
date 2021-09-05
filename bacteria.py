@@ -175,21 +175,27 @@ class Bacteria(Agent):
         else: 
             self.next_double = np.random.normal(doubling_mean, doubling_std, 1)
     
-        #parameter to determine whether cells tumble at the walls 
+        #parameter to determine whether cells tumble at the walls
+        """
         if arch_collision > 0: 
             self.wall_tumble = True
         else: 
-            self.wall_tumble  = False 
+            self.wall_tumble  = False
+        """
+
+        #temp row
+        self.wall_tumble = False
 
         #set the type of reorientation events 
         #work by Nakai et al. showed that whe peritrichous bacteria reorientate it is biased up or down gradient 
         self.biased  = True
 
-        #set global variables which are reused throughout 
+        #set global variables which are reused throughout
         global model_width
         global model_height
         model_width = width
         model_height = height
+
 
     def getTumbleAngle(self, ang_mean, ang_std):
         """
@@ -213,6 +219,9 @@ class Bacteria(Agent):
         d = random.randint(0, 1)
         if d == 0:
             angle = angle * (-1)
+
+        angle = np.random.normal(ang_mean, 0)*d #TODO remove line
+        print(angle)
 
         return angle
 
@@ -257,28 +266,20 @@ class Bacteria(Agent):
         y = pos[1]
 
         if x < 0 and y < 0:
-            x = 0 +epsilon
+            x = 0 + epsilon
             y = 0 + epsilon
-
-            self.ang = (self.ang + 180) % 360
 
         if x < 0 and y > model_height:
             x = 0 + epsilon
             y = model_height - epsilon
 
-            self.ang = (self.ang + 180) % 360
-
         if x > model_width and y < 0:
             x = model_width - epsilon
             y = 0 + epsilon
 
-            self.ang = (self.ang + 180) % 360
-
         if x > model_width and y > model_height:
             x = model_width - epsilon
             y = model_height - epsilon
-
-            self.ang = (self.ang + 180) % 360
 
         #bacteria are hitting the left wall
         if x < 0:
@@ -288,14 +289,10 @@ class Bacteria(Agent):
 
             #set variable to determine the type of collision
             p = random.uniform(0, 1)
- 
 
             #perform a tangent collision 
             if p > arch_collision:
-                #if self.ang > 180:
-                #    self.ang = (self.ang + 90) % 360
-                #else:
-                #    self.ang = (self.ang - 90) % 360
+
                 self.ang = (self.ang + 180)%360
 
         #bacteria are hitting the right wall
@@ -309,11 +306,9 @@ class Bacteria(Agent):
 
             #perform an arch collision 
             if p > arch_collision:
-                #if self.ang > 180:
-                #    self.ang = (self.ang - 90) % 360
-                #else:
-                #    self.ang = (self.ang + 90) % 360
+
                 self.ang = (self.ang + 180) % 360
+
         #bacteria are hitting the bottom wall
         elif y < 0:
 
@@ -323,16 +318,10 @@ class Bacteria(Agent):
             #set variable to determine the type of collision
             p = random.uniform(0, 1)
 
-            
             #perform an arch collision
             if p > arch_collision:
 
-                #self.ang = 45
                 self.ang = (self.ang + 180) % 360
-                #if self.ang > 270:
-                #    self.ang = (self.ang + 90)% 360
-                #else:
-                #    self.ang = (self.ang - 90)%360
 
         #bacteria are hitting the top wall
         elif y > model_height:
@@ -346,12 +335,7 @@ class Bacteria(Agent):
             #perform an arch collision
             if p > arch_collision:
 
-                #self.ang = 315
                 self.ang = (self.ang + 180) % 360
-                #if self.ang < 90:
-                #    self.ang = (self.ang - 90) % 360
-                #else:
-                #    self.ang = (self.ang + 90) % 360
 
         return [x,y]
 
@@ -361,22 +345,24 @@ class Bacteria(Agent):
         Get the concentration of attractant at a location for the currently saved concentration field
         """
 
+        # get the number of columns and rows in the concentration field
+        conc_nx = len(self.model.u[1:-1, 1:-1].T) - 1
+        conc_ny = len(self.model.u[1:-1, 1:-1]) - 1
+
         # get the increase in each direction per unit time
-        conc_dx = model_width / self.model.nx
-        conc_dy = model_height / self.model.ny
-         
+        conc_dx = model_width / conc_nx
+        conc_dy = model_height / conc_ny
+
         # find the number of decimal places to round the position to
         round_dx = np.log10(conc_dx) * -1
         round_dy = np.log10(conc_dy) * -1
 
         # get the concentration corresponding to this rounded concetration
         field_pos = [int(round(self.pos[0], int(round_dx)) / conc_dx), int(round(self.pos[1], int(round_dy)) / conc_dy)]
-    
 
-        #get this position in the concentration dataframe
-        current_pos = self.model.u[1:-1, 1:-1][field_pos[0], field_pos[1]]
+        # get this position in the concentration dataframe
+        current_pos = self.model.u[1:-1, 1:-1][field_pos[1]][field_pos[0]]
 
-        
         return current_pos
 
     def tumbleStep(self):
@@ -409,10 +395,9 @@ class Bacteria(Agent):
                 #if not currently extending the run  
                 if self.status != 2:
 
-
                     #compare the concentration at the start vs end of the tun 
-                    current_conc = self.getConcentration()
-                    #current_conc = self.pos[0]
+                    #current_conc = self.getConcentration()
+                    current_conc = self.pos[0]
                     self.c_start = self.c_end
                     self.c_end = current_conc
 
@@ -428,6 +413,7 @@ class Bacteria(Agent):
 
                         #change the status to a tumble
                         self.status = 0
+
                         #get the duration of the tumble
                         self.duration = self.getDuration(self.mean_tumble)
 
@@ -435,38 +421,11 @@ class Bacteria(Agent):
                         if self.biased == False: 
                             #reorientation from Bergs lognormal distribution
                             self.ang = (self.getTumbleAngle(self.ang_mean, self.ang_std) + self.ang) % 360
+
                         else:
 
-
-                            #OLD
                             #generate a new random angle
                             self.ang = (np.random.uniform(0, 359, 1) + self.ang) % 360
-
-
-                            """
-                            # see if the concentration has increased during the extension
-                            current_conc = self.getConcentration()
-                            #current_conc = self.pos[0]
-                            self.c_start = self.c_end
-                            self.c_end = current_conc
-                            
-                            # if the concentration has increased
-                            if self.c_end > self.c_start:
-
-                                # generate a direction for the cell to go
-                                direction = np.random.randint(0, 1)
-                                if direction == 0:
-                                    direction = -1
-
-                                # generate a small angle
-                                self.ang = (np.random.normal(self.ang_mean, self.ang_std) * direction + self.ang) % 360
-
-                            # if the concentration has not increased
-                            else:
-
-                                # generate a random angle
-                                self.ang = (np.random.uniform(0, 359, 1) + self.ang) % 360
-                            """
 
                     #save the angle to the orientation list 
                     self.model.ang_list.append(self.ang) 
@@ -487,8 +446,8 @@ class Bacteria(Agent):
                     else: 
 
                         #see if the concentration has increased during the extension 
-                        current_conc = self.getConcentration()
-                        #current_conc = self.pos[0]
+                        #current_conc = self.getConcentration()
+                        current_conc = self.pos[0]
                         self.c_start = self.c_end
                         self.c_end = current_conc
 
@@ -496,12 +455,11 @@ class Bacteria(Agent):
                         if self.c_end > self.c_start:
 
                             #generate a direction for the cell to go 
-                            direction = np.random.randint(0,1)
+                            direction = np.random.randint(0,2)
                             if direction == 0: 
                                 direction = -1
 
                             #generate a small angle
-
                             self.ang = (np.random.normal(self.ang_mean, self.ang_std)*direction + self.ang) % 360
 
                         #if the concentration has not increased 
@@ -521,7 +479,6 @@ class Bacteria(Agent):
         #get the coordinates of the position
         x = self.pos[0]
         y = self.pos[1]
-
 
         #bacteria are hitting the left wall
         if x == 0:
@@ -570,7 +527,7 @@ class Bacteria(Agent):
                     self.ang = (self.getTumbleAngle(self.ang_mean, self.ang_std) + self.ang) % 360
 
         #bacteria hitting the bottom  
-        elif y == 0:
+        elif y == 0 + epsilon:
             print('BOTTOM EDGE')
             #print('BOTTOM')
             #adjust the angle to leave the wall 
@@ -613,8 +570,8 @@ class Bacteria(Agent):
             elif self.status == 1:
 
                 #see if the concentration has increased from the start of the run 
-                # current_conc = self.pos[0]
-                current_conc = self.getConcentration()
+                current_conc = self.pos[0]
+                #current_conc = self.getConcentration()
                 self.c_start = self.c_end
                 self.c_end = current_conc
 
@@ -664,8 +621,8 @@ class Bacteria(Agent):
             elif self.status == 2:
 
                 #get the concentration at the start and end of the run 
-                # current_conc = self.pos[0]
-                current_conc = self.getConcentration()
+                current_conc = self.pos[0]
+                #current_conc = self.getConcentration()
                 self.c_start = self.c_end
                 self.c_end = current_conc
 
